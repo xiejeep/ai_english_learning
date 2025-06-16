@@ -1,16 +1,36 @@
+import 'package:flutter/material.dart';
+
 class AppConstants {
   // 应用信息
   static const String appName = 'AI English Learning';
   static const String appVersion = '1.0.0';
   
   // API配置
-  static const String baseUrl = 'https://your-api-domain.com'; // TODO: 替换为实际的API地址
+  static const String baseUrl = 'https://api.classhorse.top/';
   static const String apiVersion = 'v1';
+  
+  // API路径
+  static const String authSendCodePath = '/api/auth/send-code';
+  static const String authRegisterPath = '/api/auth/register';
+  static const String authLoginPath = '/api/auth/login';
+  static const String authSendResetCodePath = '/api/auth/send-reset-code';
+  static const String authResetPasswordPath = '/api/auth/reset-password';
+  static const String creditsBalancePath = '/api/credits/balance';
+  static const String creditsHistoryPath = '/api/credits/history';
+  static const String checkinPath = '/api/checkin';
+  static const String difychatPath = '/api/dify/chat-messages';
+  static const String difyTtsPath = '/api/dify/text-to-audio';
+  
+  // 主题颜色
+  static const Color primaryColor = Color(0xFF4A6FFF);
+  static const Color primaryLightColor = Color(0xFF7B93FF);
+  static const Color primaryDarkColor = Color(0xFF2C5BFF);
   
   // 路由路径
   static const String splashRoute = '/';
   static const String loginRoute = '/login';
   static const String registerRoute = '/register';
+  static const String forgotPasswordRoute = '/forgot-password';
   static const String homeRoute = '/home';
   static const String chatRoute = '/chat';
   static const String profileRoute = '/profile';
@@ -27,6 +47,9 @@ class AppConstants {
   static const String lastCheckinDateKey = 'last_checkin_date';
   static const String appSettingsKey = 'app_settings';
   static const String ttsAutoPlayKey = 'tts_auto_play';
+  static const String rememberedAccountsKey = 'remembered_accounts';
+  static const String lastLoginEmailKey = 'last_login_email';
+  static const String rememberAccountKey = 'remember_account';
   
   // 默认值
   static const int defaultTimeout = 30000; // 30秒
@@ -38,4 +61,4 @@ class AppConstants {
   static const int chatMessageReward = 5;
   static const int weeklyStreakReward = 20;
   static const int monthlyStreakReward = 50;
-} 
+}

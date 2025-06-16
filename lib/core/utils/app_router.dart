@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/register_page.dart';
+import '../../features/auth/presentation/pages/forgot_password_page.dart';
+import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../constants/app_constants.dart';
 import '../storage/storage_service.dart';
 
@@ -96,55 +101,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-// 临时的登录页面
-class LoginPage extends StatelessWidget {
-  const LoginPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('登录'),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.login,
-              size: 80,
-              color: Color(0xFF4A6FFF),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              '登录页面',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              '即将开发...',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: () {
-                // 模拟登录成功，跳转到主页
-                context.go(AppConstants.homeRoute);
-              },
-              child: const Text('模拟登录'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// 注意：现在使用实际的LoginPage组件（从auth模块导入）
 
 // 临时的主页面
 class HomePage extends StatelessWidget {
@@ -206,11 +163,11 @@ class HomePage extends StatelessWidget {
 }
 
 // 临时的个人中心页面
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('个人中心'),
@@ -244,9 +201,35 @@ class ProfilePage extends StatelessWidget {
             ),
             const SizedBox(height: 32),
             ElevatedButton(
-              onPressed: () {
-                // 模拟退出登录
-                context.go(AppConstants.loginRoute);
+              onPressed: () async {
+                // 显示确认退出登录的弹窗
+                final shouldLogout = await showDialog<bool>(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: const Text('退出登录'),
+                      content: const Text('确定要退出登录吗？'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          child: const Text('取消'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(true),
+                          child: const Text('确定'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+                
+                // 用户确认退出登录
+                if (shouldLogout == true) {
+                  await ref.read(authProvider.notifier).logout();
+                  if (context.mounted) {
+                    context.go(AppConstants.loginRoute);
+                  }
+                }
               },
               child: const Text('退出登录'),
             ),
@@ -319,7 +302,15 @@ class AppRouter {
       GoRoute(
         path: AppConstants.registerRoute,
         name: 'register',
-        builder: (context, state) => const LoginPage(), // 临时使用登录页
+        builder: (context, state) => const RegisterPage(),
+      ),
+      GoRoute(
+        path: AppConstants.forgotPasswordRoute,
+        name: 'forgot-password',
+        builder: (context, state) {
+          final email = state.uri.queryParameters['email'];
+          return ForgotPasswordPage(initialEmail: email);
+        },
       ),
       GoRoute(
         path: AppConstants.homeRoute,
@@ -382,4 +373,4 @@ class AppRouter {
       ),
     ),
   );
-} 
+}
