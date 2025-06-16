@@ -71,15 +71,6 @@ class StorageService {
     return _storage.read(AppConstants.ttsAutoPlayKey) ?? AppConstants.defaultAutoPlay;
   }
   
-  // 主题设置
-  static Future<void> saveDarkMode(bool isDark) async {
-    await _storage.write(AppConstants.darkModeKey, isDark);
-  }
-  
-  static bool getDarkMode() {
-    return _storage.read(AppConstants.darkModeKey) ?? false;
-  }
-  
   // 应用设置
   static Future<void> saveAppSettings(Map<String, dynamic> settings) async {
     await _storage.write(AppConstants.appSettingsKey, settings);

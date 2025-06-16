@@ -27,7 +27,6 @@ class AppConstants {
   static const String lastCheckinDateKey = 'last_checkin_date';
   static const String appSettingsKey = 'app_settings';
   static const String ttsAutoPlayKey = 'tts_auto_play';
-  static const String darkModeKey = 'dark_mode';
   
   // 默认值
   static const int defaultTimeout = 30000; // 30秒
