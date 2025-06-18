@@ -6,7 +6,8 @@ class AppConstants {
   static const String appVersion = '1.0.0';
   
   // API配置
-  static const String baseUrl = 'https://api.classhorse.top/';
+  // static const String baseUrl = 'https://api.classhorse.top/';
+  static const String baseUrl = 'http://192.168.1.40:3000/';
   static const String apiVersion = 'v1';
   
   // API路径
