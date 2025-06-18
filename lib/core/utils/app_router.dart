@@ -5,6 +5,7 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
+import '../../features/chat/presentation/pages/chat_page.dart';
 import '../constants/app_constants.dart';
 import '../storage/storage_service.dart';
 
@@ -240,49 +241,7 @@ class ProfilePage extends ConsumerWidget {
   }
 }
 
-// 临时的聊天页面
-class ChatPage extends StatelessWidget {
-  const ChatPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('英语对话'),
-        backgroundColor: const Color(0xFF4A6FFF),
-        foregroundColor: Colors.white,
-      ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.chat,
-              size: 80,
-              color: Color(0xFF4A6FFF),
-            ),
-            SizedBox(height: 24),
-            Text(
-              '英语对话页面',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            SizedBox(height: 16),
-            Text(
-              '即将开发...',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// ChatPage现在从features/chat/presentation/pages/chat_page.dart导入
 
 // 应用路由配置
 class AppRouter {
