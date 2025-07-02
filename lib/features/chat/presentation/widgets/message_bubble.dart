@@ -1,3 +1,5 @@
+
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../shared/models/message_model.dart';
@@ -6,13 +8,59 @@ class MessageBubble extends StatelessWidget {
   final MessageModel message;
   final VoidCallback? onPlayTTS;
   final VoidCallback? onCopy;
+  final bool isTTSLoading;
+  final bool isCurrentlyPlaying;
 
   const MessageBubble({
     Key? key,
     required this.message,
     this.onPlayTTS,
     this.onCopy,
+    this.isTTSLoading = false,
+    this.isCurrentlyPlaying = false,
   }) : super(key: key);
+
+  // TTS按钮图标逻辑
+  IconData _getTTSButtonIcon() {
+    if (isTTSLoading) {
+      return Icons.hourglass_empty;
+    }
+    
+    // 如果正在播放TTS，显示停止图标
+    if (isCurrentlyPlaying) {
+      return Icons.stop;
+    }
+    
+    return Icons.volume_up;
+  }
+  
+  // TTS按钮颜色逻辑
+  Color? _getTTSButtonColor() {
+    // 加载中时显示灰色
+    if (isTTSLoading) {
+      return Colors.grey.shade400;
+    }
+    return null; // 使用默认颜色
+  }
+  
+  // TTS按钮是否可用
+  bool _isTTSButtonEnabled() {
+    // 加载中时禁用
+    return !isTTSLoading;
+  }
+  
+  // TTS按钮提示文本
+  String _getTTSButtonTooltip() {
+    if (isTTSLoading) {
+      return '正在加载...';
+    }
+    
+    if (isCurrentlyPlaying) {
+      return '停止播放';
+    }
+    
+    return '播放语音';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,8 +106,17 @@ class MessageBubble extends StatelessWidget {
             children: [
               if (onPlayTTS != null)
                 IconButton(
-                  icon: const Icon(Icons.volume_up, size: 18),
-                  onPressed: onPlayTTS,
+                  icon: Icon(
+                    _getTTSButtonIcon(),
+                    size: 18,
+                    color: _getTTSButtonColor(),
+                  ),
+                  onPressed: _isTTSButtonEnabled() ? () {
+                    print('🎯 TTS按钮点击');
+                    print('📊 当前状态: isTTSLoading=$isTTSLoading, isCurrentlyPlaying=$isCurrentlyPlaying');
+                    onPlayTTS!();
+                  } : null,
+                  tooltip: _getTTSButtonTooltip(),
                 ),
               if (onCopy != null)
                 IconButton(

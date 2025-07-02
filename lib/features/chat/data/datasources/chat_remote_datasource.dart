@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -213,25 +213,69 @@ class ChatRemoteDataSource {
         
         if (contentType.contains('application/json')) {
           // 如果是JSON响应，说明可能包含错误信息
-          final jsonString = utf8.decode(response.data);
-          final responseData = jsonDecode(jsonString) as Map<String, dynamic>;
+          Map<String, dynamic> responseData;
+          
+          // 处理不同类型的响应数据
+          if (response.data is String) {
+            final jsonString = response.data as String;
+            responseData = jsonDecode(jsonString) as Map<String, dynamic>;
+          } else if (response.data is List<int>) {
+            final jsonString = utf8.decode(response.data as List<int>);
+            responseData = jsonDecode(jsonString) as Map<String, dynamic>;
+          } else {
+            responseData = response.data as Map<String, dynamic>;
+          }
+          
+          print('解析后的JSON响应: ${responseData.toString().substring(0, math.min(200, responseData.toString().length))}...');
           
           if (responseData.containsKey('error')) {
             throw Exception('TTS服务返回错误: ${responseData['error']}');
           }
           
-          // 如果JSON中包含音频数据，尝试提取
-          final audioDataString = responseData['data'] as String?;
-          if (audioDataString != null && audioDataString.isNotEmpty) {
-            // 尝试Base64解码
-            if (_isBase64(audioDataString)) {
-              final audioBytes = base64Decode(audioDataString);
-              return await _saveAudioToTempFile(audioBytes);
+          // 处理后端返回的Buffer格式数据
+          final audioData = responseData['data'];
+          if (audioData != null) {
+            List<int> audioBytes;
+            
+            if (audioData is String) {
+              // 如果是字符串，进行Base64解码
+              print('音频数据为字符串格式，长度: ${audioData.length}');
+              try {
+                audioBytes = base64Decode(audioData);
+                print('Base64解码成功，音频字节长度: ${audioBytes.length}');
+              } catch (e) {
+                print('Base64解码失败: $e');
+                throw Exception('音频数据Base64解码失败: $e');
+              }
+            } else if (audioData is Map<String, dynamic> && audioData['type'] == 'Buffer') {
+              // 如果是Buffer格式，直接提取data数组
+              print('音频数据为Buffer格式');
+              final dataList = audioData['data'] as List<dynamic>?;
+              if (dataList != null) {
+                audioBytes = dataList.cast<int>();
+                print('Buffer数据提取成功，音频字节长度: ${audioBytes.length}');
+              } else {
+                throw Exception('Buffer格式数据中没有找到data数组');
+              }
             } else {
-              // 直接使用字符串的UTF-8字节
-              final audioBytes = utf8.encode(audioDataString);
-              return await _saveAudioToTempFile(audioBytes);
+              throw Exception('不支持的音频数据格式: ${audioData.runtimeType}');
             }
+            
+            // 验证音频文件头
+            if (audioBytes.length >= 3) {
+              final header = String.fromCharCodes(audioBytes.take(3));
+              print('音频文件头: $header');
+              
+              if (header == 'ID3' || audioBytes[0] == 0xFF || audioBytes[0] == 0x52) {
+                // ID3 (MP3), FF (MP3 frame), 52 (RIFF/WAV)
+                print('检测到有效的音频文件格式');
+              } else {
+                print('音频文件头不匹配，前10个字节: ${audioBytes.take(10).toList()}');
+                print('仍尝试保存音频文件');
+              }
+            }
+            
+            return await _saveAudioToTempFile(audioBytes);
           }
           
           throw Exception('JSON响应中没有找到音频数据');
@@ -313,29 +357,30 @@ class ChatRemoteDataSource {
       
       print('JSON方法获取的音频数据长度: ${audioDataString.length}');
       
-      // 尝试Base64解码
-      if (_isBase64(audioDataString)) {
-        print('检测到Base64编码的音频数据');
+      // 直接进行Base64解码（后端现在返回Base64编码的音频）
+      print('开始Base64解码音频数据');
+      try {
         final audioBytes = base64Decode(audioDataString);
-        return await _saveAudioToTempFile(audioBytes);
-      }
-      
-      // 如果不是Base64，尝试将字符串直接转换为bytes
-      // 这种情况下，服务器可能返回的是二进制数据的字符串表示
-      print('尝试将字符串转换为音频字节...');
-      final audioBytes = latin1.encode(audioDataString); // 使用latin1编码保持字节不变
-      
-      // 验证音频格式
-      if (audioBytes.length >= 3) {
-        final header = String.fromCharCodes(audioBytes.take(3));
-        print('转换后的音频文件头: $header');
+        print('Base64解码成功，音频数据大小: ${audioBytes.length} 字节');
         
-        if (header == 'ID3' || audioBytes[0] == 0xFF || audioBytes[0] == 0x52) {
-          return await _saveAudioToTempFile(audioBytes);
+        // 验证音频文件头
+        if (audioBytes.length >= 3) {
+          final header = String.fromCharCodes(audioBytes.take(3));
+          print('音频文件头: $header');
+          
+          // 检查常见音频格式
+          if (header == 'ID3' || audioBytes[0] == 0xFF || audioBytes[0] == 0x52) {
+            print('检测到有效的音频格式');
+          } else {
+            print('警告: 未识别的音频格式，但仍尝试保存');
+          }
         }
+        
+        return await _saveAudioToTempFile(audioBytes);
+      } catch (e) {
+        print('Base64解码失败: $e');
+        throw Exception('Base64解码失败: $e');
       }
-      
-      throw Exception('无法处理的音频数据格式');
     }
     
     throw Exception('JSON方法TTS请求失败，状态码: ${response.statusCode}');
@@ -382,15 +427,7 @@ class ChatRemoteDataSource {
     }
   }
 
-  // 检查字符串是否为有效的Base64格式
-  bool _isBase64(String str) {
-    try {
-      base64Decode(str);
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
+
   
 
 

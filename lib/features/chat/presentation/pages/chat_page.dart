@@ -237,11 +237,23 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       ),
                     ),
                   // 消息列表
-                  ...pageMessages.map((msg) => MessageBubble(
-                    message: msg,
-                    onPlayTTS: msg.isAI ? () => ref.read(chatProvider.notifier).playTTS(msg.content) : null,
-                    onCopy: () => _copyMessageToClipboard(msg.content),
-                  )).toList(),
+                  ...pageMessages.map((msg) {
+                    return MessageBubble(
+                      message: msg,
+                      onPlayTTS: msg.isAI ? () {
+                        if (state.isTTSPlaying) {
+                          // 如果正在播放，则停止播放
+                          ref.read(chatProvider.notifier).stopTTS();
+                        } else {
+                          // 否则播放当前消息
+                          ref.read(chatProvider.notifier).playTTS(msg.content);
+                        }
+                      } : null,
+                      onCopy: () => _copyMessageToClipboard(msg.content),
+                      isTTSLoading: state.isTTSLoading,
+                      isCurrentlyPlaying: state.isTTSPlaying,
+                    );
+                  }).toList(),
                 ],
               ),
             );
@@ -320,12 +332,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   ? Colors.blue.withValues(alpha: 0.1)
                   : Colors.grey.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: onPressed != null 
-                    ? Colors.blue.withValues(alpha: 0.3)
-                    : Colors.grey.withValues(alpha: 0.3),
-                  width: 1,
-                ),
+            
               ),
               child: Center(
                 child: isLoading

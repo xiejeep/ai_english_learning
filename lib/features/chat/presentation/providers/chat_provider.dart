@@ -35,9 +35,51 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
 class ChatNotifier extends StateNotifier<ChatState> {
   final ChatRepository _repository;
   StreamSubscription<Map<String, dynamic>>? _streamSubscription;
+  static AudioPlayer? _audioPlayer;
 
   ChatNotifier(this._repository) : super(const ChatState()) {
+    _loadInitialData();
+    _initAudioPlayer();
+  }
+
+  // 加载初始数据
+  Future<void> _loadInitialData() async {
     _initializeTTSSettings();
+    await loadLatestConversation();
+  }
+
+  // 初始化音频播放器
+  void _initAudioPlayer() {
+    if (_audioPlayer == null) {
+      _audioPlayer = AudioPlayer();
+      _audioPlayer!.onPlayerStateChanged.listen((playerState) {
+        print('🎵 播放器状态变化: $playerState');
+        
+        // 根据播放器状态更新TTS状态
+        if (playerState == PlayerState.playing) {
+          // 开始播放时设置播放状态，清除加载状态
+          state = state.copyWith(
+            isTTSLoading: false,
+            isTTSPlaying: true,
+          );
+          print('🔍 播放器状态监听器: 播放开始，isTTSPlaying=true');
+        } else if (playerState == PlayerState.stopped) {
+          // 停止播放时清除播放状态
+          state = state.copyWith(
+            isTTSPlaying: false,
+          );
+          print('🔍 播放器状态监听器: 播放停止，isTTSPlaying=false');
+        }
+      });
+      _audioPlayer!.onPlayerComplete.listen((_) {
+        print('✅ 音频播放完成');
+        // 播放完成时清除所有TTS状态
+        state = state.copyWith(
+          isTTSLoading: false,
+          isTTSPlaying: false,
+        );
+      });
+    }
   }
 
   // 初始化TTS设置
@@ -530,8 +572,28 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   // 播放TTS（直接获取音频文件）
   Future<void> playTTS(String text) async {
+    // 如果正在播放，先停止
+    if (state.isTTSPlaying) {
+      await stopTTS();
+    }
+    
     try {
       print('🔊 正在获取TTS音频: ${text.substring(0, text.length.clamp(0, 50))}...');
+      
+      // 设置加载状态
+      state = state.copyWith(
+        isTTSLoading: true,
+        isTTSPlaying: false,
+      );
+      print('🔍 TTS加载开始: isTTSLoading=true');
+      
+      // 确保音频播放器已初始化
+      _initAudioPlayer();
+      
+      // 停止当前播放
+      if (_audioPlayer!.state == PlayerState.playing) {
+        await _audioPlayer!.stop();
+      }
       
       // 直接获取TTS音频文件路径
       final audioFilePath = await _repository.getTTSAudio(text);
@@ -546,29 +608,69 @@ class ChatNotifier extends StateNotifier<ChatState> {
       final fileSize = await audioFile.length();
       print('📁 音频文件信息: 路径=$audioFilePath, 大小=$fileSize 字节');
       
-      // 创建音频播放器并设置监听器
-      final player = AudioPlayer();
+      // 验证音频文件格式
+      final audioBytes = await audioFile.readAsBytes();
+      if (audioBytes.length < 10) {
+        throw Exception('音频文件太小，可能损坏');
+      }
       
-      // 设置错误监听器
-      player.onPlayerStateChanged.listen((state) {
-        print('🎵 播放器状态变化: $state');
-      });
-      
-      // 播放完成监听器
-      player.onPlayerComplete.listen((_) async {
-        print('✅ 音频播放完成');
-        await player.dispose();
-      });
+      // 检查MP3文件头
+      final header = String.fromCharCodes(audioBytes.take(3));
+      if (header != 'ID3' && audioBytes[0] != 0xFF) {
+        print('⚠️ 音频文件格式可能不标准，尝试播放...');
+      }
       
       // 播放音频文件
       print('🎯 开始播放音频文件...');
-      await player.play(DeviceFileSource(audioFilePath));
+      
+      await _audioPlayer!.play(DeviceFileSource(audioFilePath));
       print('🎵 音频播放已启动');
+      
+      // 播放成功，状态将在onPlayerStateChanged中自动更新
+      print('🎯 TTS播放启动成功，等待播放器状态更新');
       
     } catch (e, stackTrace) {
       print('❌ 播放TTS失败: $e');
       print('📋 错误堆栈: $stackTrace');
-      // 不要在UI中显示错误，只记录日志
+      
+      // 立即清除所有TTS状态
+      state = state.copyWith(
+        isTTSLoading: false,
+        isTTSPlaying: false,
+      );
+      
+      // 尝试重新初始化播放器
+      try {
+        await _audioPlayer?.dispose();
+        _audioPlayer = null;
+        _initAudioPlayer();
+        print('🔄 音频播放器已重新初始化');
+      } catch (reinitError) {
+        print('❌ 重新初始化播放器失败: $reinitError');
+      }
+    }
+  }
+  
+  // 停止TTS播放
+  Future<void> stopTTS() async {
+    try {
+      print('🛑 停止TTS播放');
+      if (_audioPlayer != null && _audioPlayer!.state == PlayerState.playing) {
+        await _audioPlayer!.stop();
+      }
+      // 清除所有TTS状态
+      state = state.copyWith(
+        isTTSLoading: false,
+        isTTSPlaying: false,
+      );
+      print('✅ TTS状态已清除');
+    } catch (e) {
+      print('❌ 停止TTS播放失败: $e');
+      // 即使停止失败，也要清除状态
+      state = state.copyWith(
+        isTTSLoading: false,
+        isTTSPlaying: false,
+      );
     }
   }
   
@@ -610,6 +712,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
   @override
   void dispose() {
     _streamSubscription?.cancel();
+    _audioPlayer?.dispose();
+    _audioPlayer = null;
     super.dispose();
   }
 }

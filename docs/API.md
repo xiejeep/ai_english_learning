@@ -356,7 +356,7 @@
 - **响应**:
 ```json
 {
-  "audio_url": "string" // 或 "audio_base64": "string"
+  "audio_base64": "string" // Base64编码的WAV音频数据，格式为 data:audio/wav;base64,xxx
 }
 ```
 
