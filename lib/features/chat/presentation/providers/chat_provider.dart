@@ -1,10 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../data/datasources/chat_remote_datasource.dart';
 import '../../data/datasources/chat_local_datasource.dart';
@@ -12,9 +8,9 @@ import '../../data/repositories/chat_repository_impl.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../../../../shared/models/message_model.dart';
 import '../../domain/entities/conversation.dart';
-import '../../data/models/conversation_model.dart';
 import 'chat_state.dart';
 import '../../../../core/storage/storage_service.dart';
+import '../../../../core/services/tts_cache_service.dart';
 
 // 聊天相关的Provider
 final chatRemoteDataSourceProvider = Provider<ChatRemoteDataSource>((ref) {
@@ -40,6 +36,17 @@ class ChatNotifier extends StateNotifier<ChatState> {
   ChatNotifier(this._repository) : super(const ChatState()) {
     _loadInitialData();
     _initAudioPlayer();
+    _initTTSCache();
+  }
+  
+  // 初始化TTS缓存服务
+  Future<void> _initTTSCache() async {
+    try {
+      await TTSCacheService.instance.initialize();
+      print('✅ TTS缓存服务初始化完成');
+    } catch (e) {
+      print('❌ TTS缓存服务初始化失败: $e');
+    }
   }
 
   // 加载初始数据
@@ -116,28 +123,42 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
 
 
-  // 切换到指定会话（分页加载）
+  // 切换到指定会话
   Future<void> switchToConversation(Conversation conversation) async {
     try {
       print('🔄 切换到会话: ${conversation.displayName} (ID: ${conversation.id})');
+      
+      // 停止当前播放的TTS音频
+      if (state.isTTSPlaying || state.isTTSLoading) {
+        print('🛑 会话切换时停止TTS播放');
+        await stopTTS();
+      }
+      
       state = state.setLoading();
       
-      // 加载最新一组对话
-      final messages = await _repository.getMessagesWithPagination(
+      // 加载最新的消息
+      final result = await _repository.getMessagesWithPagination(
         conversation.id,
-        limit: state.pageSize,
+        limit: 5, // 初始加载5条消息
         firstId: null, // 不指定firstId，获取最新消息
       );
       
-      print('✅ 成功加载会话最新消息，共 ${messages.length} 条消息');
+      final messages = result.$1; // 获取消息列表
+      final hasMore = result.$2; // 获取是否还有更多消息
+      
+      print('✅ 成功加载会话消息，共 ${messages.length} 条消息');
+      
+      // 设置游标为最早的消息ID
+      final firstId = messages.isNotEmpty 
+          ? _extractOriginalMessageId(messages.first.id) 
+          : null;
       
       state = state.copyWith(
         currentConversation: conversation,
         messages: messages,
         status: ChatStatus.success,
-        firstId: messages.isNotEmpty ? messages.last.id : null, // 设置游标为最后一条消息的ID
-        hasMoreMessages: messages.length >= state.pageSize,
-        hasNewerMessages: false, // 切换会话时加载的是最新消息
+        firstId: firstId,
+        hasMoreMessages: hasMore,
       );
     } catch (e) {
       print('❌ 加载会话消息失败: $e');
@@ -145,7 +166,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
-  // 加载最新会话（PageView版本）
+  // 加载最新会话
   Future<void> loadLatestConversation() async {
     try {
       print('🚀 开始加载最新会话...');
@@ -157,28 +178,32 @@ class ChatNotifier extends StateNotifier<ChatState> {
       if (latestConversation != null) {
         print('🎯 找到最新会话: ${latestConversation.displayName}');
         
-        // 加载最新一组对话（limit=1，只加载最新的一条消息）
-        final messages = await _repository.getMessagesWithPagination(
+        // 加载最新的消息
+        final result = await _repository.getMessagesWithPagination(
           latestConversation.id,
-          limit: 1, // 只加载最新的一条消息
+          limit: 5, // 初始加载5条消息
           firstId: null, // 不指定firstId，获取最新消息
         );
         
-        print('✅ 成功加载最新会话和最新消息，共 ${messages.length} 条消息');
+        final messages = result.$1; // 获取消息列表
+        final hasMore = result.$2; // 获取是否还有更多消息
         
-        // 初始化PageView，将最新消息作为第一页
-        final conversationPages = messages.isNotEmpty ? [messages] : <List<MessageModel>>[];
+        print('✅ 成功加载最新会话和消息，共 ${messages.length} 条消息');
+        
+        // 设置游标为最早的消息ID
+        final firstId = messages.isNotEmpty 
+            ? _extractOriginalMessageId(messages.first.id) 
+            : null;
         
         state = state.copyWith(
           currentConversation: latestConversation,
           messages: messages,
           status: ChatStatus.success,
-          firstId: messages.isNotEmpty ? messages.last.id : null, // 设置游标为最后一条消息的ID
-          hasMoreMessages: messages.length >= 1, // 如果有消息，可能还有更多历史消息
-          hasNewerMessages: false, // 加载的是最新消息，没有更新的消息
-          conversationPages: conversationPages,
-          currentPageIndex: 0, // 当前在第一页（最新页）
+          firstId: firstId,
+          hasMoreMessages: hasMore,
         );
+        
+        print('🎯 初始游标设置为: $firstId');
       } else {
         print('📝 没有找到现有会话，将创建新会话');
         state = state.copyWith(
@@ -187,9 +212,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
           status: ChatStatus.success,
           firstId: null,
           hasMoreMessages: false,
-          hasNewerMessages: false,
-          conversationPages: <List<MessageModel>>[],
-          currentPageIndex: 0,
         );
       }
     } catch (e) {
@@ -198,42 +220,57 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
-  // 加载更多历史消息（PageView版本 - 添加新页面）
+  // 加载更多历史消息
   Future<void> loadMoreMessages() async {
     if (state.isLoadingMore || !state.hasMoreMessages || state.currentConversation == null) {
       return;
     }
 
     try {
-      print('📖 开始加载更多历史消息，当前游标: ${state.firstId}');
+      // 在状态更新之前保存当前的firstId
+      final currentFirstId = state.firstId;
+      final conversationId = state.currentConversation!.id;
+      
+      print('📖 开始加载更多历史消息，当前游标: $currentFirstId');
+      print('🔍 [DEBUG] firstId参数检查: firstId=$currentFirstId, isNull=${currentFirstId == null}, isEmpty=${currentFirstId?.isEmpty ?? true}');
+      
       state = state.copyWith(isLoadingMore: true);
       
-      // 提取原始消息ID（去掉_user或_assistant后缀）用于API请求
-      final originalFirstId = state.firstId != null 
-          ? _extractOriginalMessageId(state.firstId!) 
-          : null;
-      
-      // 加载下一组对话（limit=1，加载一条历史消息）
-      final newMessages = await _repository.getMessagesWithPagination(
-        state.currentConversation!.id,
-        limit: 1,
-        firstId: originalFirstId, // 使用提取的原始消息ID
+      // 使用保存的firstId加载历史消息
+      final result = await _repository.getMessagesWithPagination(
+        conversationId,
+        limit: 5, // 每次加载更多消息
+        firstId: currentFirstId,
       );
       
+      final newMessages = result.$1; // 获取消息列表
+      final hasMore = result.$2; // 获取是否还有更多消息
+      
+      print('📋 获取到 ${newMessages.length} 条新消息');
+      print('🔍 当前游标: $currentFirstId');
+      print('📊 API返回hasMore: $hasMore');
+      
       if (newMessages.isNotEmpty) {
-        // 将新的对话页面添加到conversationPages数组的末尾
-        final updatedPages = [...state.conversationPages, newMessages];
+        // 将新的历史消息插入到现有消息列表的开头
+        final updatedMessages = [...newMessages, ...state.messages];
+        
+        // 更新游标为最早的消息ID
+        final newFirstId = newMessages.isNotEmpty 
+            ? _extractOriginalMessageId(newMessages.first.id) 
+            : currentFirstId;
         
         state = state.copyWith(
-          conversationPages: updatedPages,
-          firstId: newMessages.isNotEmpty ? newMessages.last.id : state.firstId, // 更新游标为最后一条消息的ID
-          hasMoreMessages: newMessages.length >= 1, // 如果返回了消息，可能还有更多
+          messages: updatedMessages,
+          firstId: newFirstId,
+          hasMoreMessages: hasMore,
           isLoadingMore: false,
         );
         
-        print('✅ 成功加载 ${newMessages.length} 条历史消息，添加新页面，总页数: ${updatedPages.length}');
+        print('🎯 游标已更新为: $newFirstId');
+        print('✅ 成功加载 ${newMessages.length} 条历史消息，总消息数: ${updatedMessages.length}');
       } else {
         // 没有更多消息了
+        print('⚠️ 没有获取到新消息，设置hasMoreMessages=false');
         state = state.copyWith(
           hasMoreMessages: false,
           isLoadingMore: false,
@@ -244,37 +281,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
       print('❌ 加载更多消息失败: $e');
       state = state.copyWith(
         isLoadingMore: false,
+        hasMoreMessages: false, // 出错时也设置为false，避免无限重试
         error: '加载更多消息失败: $e',
       );
     }
   }
 
-  // PageView页面切换处理
-  void onPageChanged(int pageIndex) {
-    if (pageIndex < 0 || pageIndex >= state.conversationPages.length) {
-      return;
-    }
-    
-    // 更新当前页面索引和显示的消息
-    final currentPageMessages = state.conversationPages[pageIndex];
-    
-    // 检查是否还有更多历史消息可以加载
-    // 如果不在最后一页，说明可能还有更多历史消息
-    final isLastPage = pageIndex == state.conversationPages.length - 1;
-    final shouldShowMoreButton = !isLastPage || state.hasMoreMessages;
-    
-    state = state.copyWith(
-      currentPageIndex: pageIndex,
-      messages: currentPageMessages,
-      hasNewerMessages: pageIndex > 0, // 如果不在第一页，说明有更新的消息
-      hasMoreMessages: shouldShowMoreButton, // 根据当前页面位置更新hasMoreMessages
-    );
-    
-    print('📄 切换到第 ${pageIndex + 1} 页，显示 ${currentPageMessages.length} 条消息，hasMoreMessages: $shouldShowMoreButton');
-  }
-  
-  // 检查是否可以加载更多页面（用于PageView的预加载）
-  bool get canLoadMorePages => state.hasMoreMessages && !state.isLoadingMore;
+  // 检查是否可以加载更多消息
+  bool get canLoadMoreMessages => state.hasMoreMessages && !state.isLoadingMore;
 
   // 发送消息（流式响应）
   Future<void> sendMessageStream(String content) async {
@@ -293,7 +307,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
 
     try {
-      // 添加用户消息
+      // 创建用户消息
       final userMessage = MessageModel(
         id: _generateMessageId(),
         content: content,
@@ -303,56 +317,31 @@ class ChatNotifier extends StateNotifier<ChatState> {
         conversationId: conversationId,
       );
 
-      // 更新状态：添加用户消息并设置发送状态
-      final updatedMessages = [...state.messages, userMessage];
-      
-      // 更新PageView的第一页（最新页）
-      List<List<MessageModel>> updatedPages = [...state.conversationPages];
-      if (updatedPages.isNotEmpty) {
-        updatedPages[0] = updatedMessages;
-      } else {
-        updatedPages = [updatedMessages];
-      }
-      
-      state = state.copyWith(
-        messages: updatedMessages,
-        conversationPages: updatedPages,
-        status: ChatStatus.sending,
-      );
-
-      // 保存用户消息
-      await _repository.saveMessage(userMessage);
-
-      // 设置AI思考中状态
-      state = state.setThinking();
-
       // 创建临时AI消息用于显示流式响应
       final tempAiMessage = MessageModel(
         id: _generateMessageId(),
-        content: '',
+        content: '正在思考中...',
         type: MessageType.ai,
         status: MessageStatus.received,
         timestamp: DateTime.now(),
         conversationId: conversationId,
       );
 
-      // 添加临时AI消息
-      final messagesWithAI = [...state.messages, tempAiMessage];
+      // 添加用户消息和临时AI消息到消息列表末尾
+      final updatedMessages = [...state.messages, userMessage, tempAiMessage];
       
-      // 更新PageView的第一页（最新页）
-      List<List<MessageModel>> updatedPagesWithAI = [...state.conversationPages];
-      if (updatedPagesWithAI.isNotEmpty) {
-        updatedPagesWithAI[0] = messagesWithAI;
-      } else {
-        updatedPagesWithAI = [messagesWithAI];
-      }
-      
+      // 立即更新状态，显示用户消息和思考中的AI消息
       state = state.copyWith(
-        messages: messagesWithAI,
-        conversationPages: updatedPagesWithAI,
-        status: ChatStatus.streaming,
+        messages: updatedMessages,
+        status: ChatStatus.sending,
         isStreaming: true,
       );
+
+      // 保存用户消息
+      await _repository.saveMessage(userMessage);
+
+      // 设置AI思考中状态
+      state = state.copyWith(status: ChatStatus.thinking);
 
       String fullResponse = '';
 
@@ -386,49 +375,37 @@ class ChatNotifier extends StateNotifier<ChatState> {
               
               state = state.copyWith(currentConversation: updatedConversation);
               
-                             // 异步保存真实的会话到本地存储
-               _saveConversationAsync(updatedConversation);
+              // 异步保存真实的会话到本地存储
+              _saveConversationAsync(updatedConversation);
               
               // 更新消息的会话ID
-              final updatedUserMessage = userMessage.copyWith(conversationId: newConversationId);
-              final updatedTempMessage = tempAiMessage.copyWith(conversationId: newConversationId);
-              
               final updatedMessages = state.messages.map((msg) {
-                if (msg.id == userMessage.id) return updatedUserMessage;
-                if (msg.id == tempAiMessage.id) return updatedTempMessage;
+                if (msg.id == userMessage.id) {
+                  return msg.copyWith(conversationId: newConversationId);
+                } else if (msg.id == tempAiMessage.id) {
+                  return msg.copyWith(conversationId: newConversationId);
+                }
                 return msg;
               }).toList();
               
-              // 同时更新PageView的第一页
-              List<List<MessageModel>> updatedPagesForConvId = [...state.conversationPages];
-              if (updatedPagesForConvId.isNotEmpty) {
-                updatedPagesForConvId[0] = updatedMessages;
-              }
-              
-              state = state.copyWith(
-                messages: updatedMessages,
-                conversationPages: updatedPagesForConvId,
-              );
+              state = state.copyWith(messages: updatedMessages);
             }
           }
           
-          // 更新临时消息的内容
+          // 更新临时消息的内容（第一个chunk时清除"思考中"提示）
+          final displayContent = fullResponse.isEmpty ? '正在输入...' : fullResponse;
+          
+          // 更新临时AI消息的内容
           final updatedMessages = state.messages.map((msg) {
             if (msg.id == tempAiMessage.id) {
-              return msg.copyWith(content: fullResponse);
+              return msg.copyWith(content: displayContent);
             }
             return msg;
           }).toList();
-
-          // 同时更新PageView的第一页
-          List<List<MessageModel>> updatedPagesForStreaming = [...state.conversationPages];
-          if (updatedPagesForStreaming.isNotEmpty) {
-            updatedPagesForStreaming[0] = updatedMessages;
-          }
           
           state = state.copyWith(
             messages: updatedMessages,
-            conversationPages: updatedPagesForStreaming,
+            status: ChatStatus.streaming,
             streamingMessage: fullResponse,
           );
         },
@@ -441,27 +418,19 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
           await _repository.saveMessage(finalAiMessage);
 
-          // 更新状态
+          // 更新最终消息
           final updatedMessages = state.messages.map((msg) {
             if (msg.id == tempAiMessage.id) {
               return finalAiMessage;
             }
             return msg;
           }).toList();
-
-          // 同时更新PageView的第一页
-          List<List<MessageModel>> finalUpdatedPages = [...state.conversationPages];
-          if (finalUpdatedPages.isNotEmpty) {
-            finalUpdatedPages[0] = updatedMessages;
-          }
           
           state = state.copyWith(
             messages: updatedMessages,
-            conversationPages: finalUpdatedPages,
             status: ChatStatus.success,
             isStreaming: false,
             streamingMessage: '',
-            firstId: null, // 重置游标
           );
 
           // 如果开启了自动播放，播放TTS
@@ -470,20 +439,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
           }
         },
         onError: (error) {
-          // 处理错误：移除临时消息
-          final filteredMessages = state.messages
+          // 处理错误：移除临时AI消息
+          print('❌ 消息发送失败: $error');
+          
+          final errorUpdatedMessages = state.messages
               .where((msg) => msg.id != tempAiMessage.id)
               .toList();
-
-          // 同时更新PageView的第一页
-          List<List<MessageModel>> errorUpdatedPages = [...state.conversationPages];
-          if (errorUpdatedPages.isNotEmpty) {
-            errorUpdatedPages[0] = filteredMessages;
-          }
           
           state = state.copyWith(
-            messages: filteredMessages,
-            conversationPages: errorUpdatedPages,
+            messages: errorUpdatedMessages,
             status: ChatStatus.error,
             error: '发送消息失败: $error',
             isStreaming: false,
@@ -570,7 +534,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
-  // 播放TTS（直接获取音频文件）
+  // 播放TTS（带缓存功能）
   Future<void> playTTS(String text) async {
     // 如果正在播放，先停止
     if (state.isTTSPlaying) {
@@ -595,9 +559,35 @@ class ChatNotifier extends StateNotifier<ChatState> {
         await _audioPlayer!.stop();
       }
       
-      // 直接获取TTS音频文件路径
-      final audioFilePath = await _repository.getTTSAudio(text);
-      print('✅ 音频文件获取成功: $audioFilePath');
+      String audioFilePath;
+      
+      // 首先检查缓存
+      final cachedPath = await TTSCacheService.instance.getCachedAudioPath(text);
+      if (cachedPath != null) {
+        print('🎯 使用缓存音频文件: $cachedPath');
+        audioFilePath = cachedPath;
+      } else {
+        print('📡 从服务器获取TTS音频...');
+        // 从服务器获取音频文件
+        final tempAudioPath = await _repository.getTTSAudio(text);
+        print('✅ 音频文件获取成功: $tempAudioPath');
+        
+        // 缓存音频文件
+        try {
+          audioFilePath = await TTSCacheService.instance.cacheAudioFile(text, tempAudioPath);
+          print('💾 音频文件已缓存: $audioFilePath');
+          
+          // 删除临时文件
+          final tempFile = File(tempAudioPath);
+          if (await tempFile.exists()) {
+            await tempFile.delete();
+            print('🗑️ 临时文件已删除: $tempAudioPath');
+          }
+        } catch (cacheError) {
+          print('⚠️ 缓存音频文件失败: $cacheError，使用临时文件');
+          audioFilePath = tempAudioPath;
+        }
+      }
       
       // 验证文件是否存在
       final audioFile = File(audioFilePath);
@@ -681,6 +671,30 @@ class ChatNotifier extends StateNotifier<ChatState> {
     final newValue = !state.autoPlayTTS;
     await StorageService.saveTTSAutoPlay(newValue);
     state = state.copyWith(autoPlayTTS: newValue);
+  }
+  
+  // 获取TTS缓存统计信息
+  Future<Map<String, dynamic>> getTTSCacheStats() async {
+    try {
+      return await TTSCacheService.instance.getCacheStats();
+    } catch (e) {
+      print('❌ 获取TTS缓存统计失败: $e');
+      return {
+        'error': e.toString(),
+        'fileCount': 0,
+        'totalSizeMB': 0.0,
+      };
+    }
+  }
+  
+  // 清空TTS缓存
+  Future<void> clearTTSCache() async {
+    try {
+      await TTSCacheService.instance.clearAllCache();
+      print('✅ TTS缓存已清空');
+    } catch (e) {
+      print('❌ 清空TTS缓存失败: $e');
+    }
   }
 
   // 清除错误状态

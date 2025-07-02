@@ -79,35 +79,27 @@ class ChatRepositoryImpl implements ChatRepository {
       
       // 将API响应转换为MessageModel
       final messages = messagesData.map((data) {
-        // 处理时间戳转换（API返回的是秒级时间戳）
-        final createdAtTimestamp = data['created_at'];
-        DateTime createdAt = DateTime.now();
-        if (createdAtTimestamp is int) {
-          createdAt = DateTime.fromMillisecondsSinceEpoch(createdAtTimestamp * 1000);
-        } else if (createdAtTimestamp is String) {
-          createdAt = DateTime.tryParse(createdAtTimestamp) ?? DateTime.now();
-        }
-        
-        // 根据role字段确定消息类型
-        final role = data['role'] as String? ?? 'user';
+        final role = data['role'] as String;
         final messageType = role == 'assistant' ? MessageType.ai : MessageType.user;
         
         return MessageModel(
           id: data['id'] as String,
-          content: data['content'] as String? ?? '',
+          content: data['content'] as String,
           type: messageType,
           status: MessageStatus.received,
-          timestamp: createdAt,
-          conversationId: conversationId,
+          timestamp: DateTime.fromMillisecondsSinceEpoch(
+            (data['created_at'] as int) * 1000,
+          ),
+          conversationId: data['conversation_id'] as String? ?? conversationId,
         );
       }).toList();
       
-      // 按时间戳排序，确保消息顺序正确
+      // 按时间戳排序（从旧到新）
       messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
       
-      // 将远程获取的消息保存到本地存储
+      // 打印消息详情
       for (final message in messages) {
-        await _localDataSource.saveMessage(message);
+        print('📝 消息: ${message.id} - ${message.type} - ${message.content.length > 50 ? message.content.substring(0, 50) + '...' : message.content}');
       }
       
       print('🔄 从远程API获取会话 $conversationId 的 ${messages.length} 条消息');
@@ -120,18 +112,26 @@ class ChatRepositoryImpl implements ChatRepository {
   }
   
   @override
-  Future<List<MessageModel>> getMessagesWithPagination(
+  Future<(List<MessageModel>, bool)> getMessagesWithPagination(
     String conversationId, {
     int? limit,
     String? firstId,
   }) async {
     try {
-      // 从远程API获取会话消息（带分页参数）
-      final messagesData = await _remoteDataSource.getConversationMessagesWithPagination(
+      print('🔍 [DEBUG] Repository收到分页请求: conversationId=$conversationId, limit=$limit, firstId=$firstId');
+      print('🔍 [DEBUG] firstId参数检查: isNull=${firstId == null}, isEmpty=${firstId?.isEmpty ?? true}');
+      
+      // 从远程数据源获取消息
+      final result = await _remoteDataSource.getConversationMessagesWithPagination(
         conversationId,
         limit: limit,
         firstId: firstId,
       );
+      
+      final messagesData = result['messages'] as List<Map<String, dynamic>>;
+      final hasMore = result['has_more'] as bool;
+      
+      print('📊 Repository收到分页结果: 消息数=${messagesData.length}, has_more=$hasMore');
       
       // 将API响应转换为MessageModel
       final messages = messagesData.map((data) {
@@ -166,30 +166,36 @@ class ChatRepositoryImpl implements ChatRepository {
         await _localDataSource.saveMessage(message);
       }
       
-      print('🔄 从远程API获取会话 $conversationId 的分页消息，limit=$limit, firstId=$firstId，共 ${messages.length} 条消息');
-      return messages;
+      return (messages, hasMore);
     } catch (e) {
-      print('从远程API获取分页消息失败，尝试使用本地数据: $e');
-      // 如果远程API失败，回退到本地存储
-      final allMessages = await _localDataSource.getMessages(conversationId);
+      print('❌ 远程获取消息失败，尝试从本地获取: $e');
       
-      // 在本地进行游标分页处理
-      if (firstId != null || limit != null) {
-        final pageSize = limit ?? 20;
+      // 如果远程失败，从本地存储获取
+      try {
+        final localMessages = await _localDataSource.getMessages(conversationId);
         
+        // 简单的分页处理
+        final sortedMessages = localMessages
+          ..sort((a, b) => b.timestamp.compareTo(a.timestamp)); // 按时间倒序
+        
+        int startIndex = 0;
         if (firstId != null) {
-          // 找到firstId对应的消息位置
-          final startIndex = allMessages.indexWhere((msg) => msg.id == firstId);
-          if (startIndex >= 0) {
-            return allMessages.skip(startIndex).take(pageSize).toList();
-          }
+          startIndex = sortedMessages.indexWhere((msg) => msg.id == firstId);
+          if (startIndex == -1) startIndex = 0;
+          startIndex++; // 从下一条开始
         }
         
-        // 如果没有firstId或找不到对应消息，返回前pageSize条
-        return allMessages.take(pageSize).toList();
+        final pageSize = limit ?? 20;
+        final endIndex = (startIndex + pageSize).clamp(0, sortedMessages.length);
+        final pageMessages = sortedMessages.sublist(startIndex, endIndex);
+        
+        final hasMore = endIndex < sortedMessages.length;
+        
+        return (pageMessages, hasMore);
+      } catch (localError) {
+        print('❌ 本地获取消息也失败: $localError');
+        return (<MessageModel>[], false);
       }
-      
-      return allMessages;
     }
   }
   

@@ -58,34 +58,21 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Row(
+        
+          Row(
             children: [
-              Icon(
-                Icons.psychology_rounded,
-                color: Colors.white,
-                size: 32,
-              ),
-              SizedBox(width: 12),
               Text(
-                'AI 英语助手',
+                '管理你的对话记录',
                 style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+                  color: Colors.white.withOpacity(0.9),
+                  fontSize: 16,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            '管理你的对话记录',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
-              fontSize: 14,
-            ),
-          ),
-          const Spacer(),
+          const SizedBox(height: 20),
           Consumer(
             builder: (context, ref, child) {
               final conversationListState = ref.watch(conversationListProvider);
@@ -135,8 +122,6 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
     );
   }
 
-
-
   Widget _buildConversationsList() {
     return Consumer(
       builder: (context, ref, child) {
@@ -180,10 +165,15 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
           );
         }
 
+        // 只展示最新10个会话，按updatedAt倒序
+        final sortedConversations = [...conversationListState.conversations]
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+        final latestConversations = sortedConversations.take(10).toList();
+
         return ListView.builder(
-          itemCount: conversationListState.conversations.length,
+          itemCount: latestConversations.length,
           itemBuilder: (context, index) {
-            final conversation = conversationListState.conversations[index];
+            final conversation = latestConversations[index];
             final isSelected = chatState.currentConversation?.id == conversation.id;
             
             return _buildConversationTile(conversation, isSelected);

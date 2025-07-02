@@ -7,6 +7,7 @@ class MessageInput extends StatefulWidget {
   final VoidCallback? onSend;
   final VoidCallback? onStop;
   final String? hintText;
+  final bool autofocus;
 
   const MessageInput({
     super.key,
@@ -16,6 +17,7 @@ class MessageInput extends StatefulWidget {
     this.onSend,
     this.onStop,
     this.hintText,
+    this.autofocus = false,
   });
 
   @override
@@ -24,10 +26,12 @@ class MessageInput extends StatefulWidget {
 
 class _MessageInputState extends State<MessageInput> {
   bool _isEmpty = true;
+  late final FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
+    _focusNode = FocusNode();
     widget.controller.addListener(_onTextChanged);
     _isEmpty = widget.controller.text.trim().isEmpty;
   }
@@ -35,6 +39,7 @@ class _MessageInputState extends State<MessageInput> {
   @override
   void dispose() {
     widget.controller.removeListener(_onTextChanged);
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -93,6 +98,8 @@ class _MessageInputState extends State<MessageInput> {
                 ),
                 child: TextField(
                   controller: widget.controller,
+                  focusNode: _focusNode,
+                  autofocus: widget.autofocus,
                   maxLines: null,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _handleSend(),

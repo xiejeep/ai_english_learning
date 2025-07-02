@@ -685,16 +685,29 @@ class ChatRemoteDataSource {
   }
 
   // 获取会话消息（带分页参数）
-  Future<List<Map<String, dynamic>>> getConversationMessagesWithPagination(
+  Future<Map<String, dynamic>> getConversationMessagesWithPagination(
     String conversationId, {
     int? limit,
     String? firstId,
   }) async {
     try {
-      final queryParams = <String, dynamic>{};
-      if (limit != null) queryParams['limit'] = limit;
-      if (firstId != null) queryParams['first_id'] = firstId;
+      print('🔍 [DEBUG] DataSource收到分页请求: conversationId=$conversationId');
+      print('🔍 [DEBUG] 参数详情: limit=$limit, firstId=$firstId');
+      print('🔍 [DEBUG] firstId检查: isNull=${firstId == null}, isEmpty=${firstId?.isEmpty ?? true}, value="$firstId"');
       
+      final queryParams = <String, dynamic>{};
+      if (limit != null) {
+        queryParams['limit'] = limit;
+        print('🔍 [DEBUG] 添加limit参数: $limit');
+      }
+      if (firstId != null) {
+        queryParams['first_id'] = firstId;
+        print('🔍 [DEBUG] 添加first_id参数: $firstId');
+      } else {
+        print('🔍 [DEBUG] firstId为空，不添加first_id参数: firstId=$firstId');
+      }
+      
+      print('🔍 [DEBUG] 最终查询参数: $queryParams');
       print('🚀 获取会话消息请求: GET /api/dify/conversations/$conversationId/messages${queryParams.isNotEmpty ? '?${queryParams.entries.map((e) => '${e.key}=${e.value}').join('&')}' : ''}');
       
       final response = await _dio.get(
@@ -718,14 +731,17 @@ class ChatRemoteDataSource {
         final outerData = responseData['data'] as Map<String, dynamic>?;
         if (outerData != null) {
           final rawMessages = outerData['data'] as List?;
+          final hasMore = outerData['has_more'] as bool? ?? false;
+          
+          print('📊 API返回分页信息: has_more=$hasMore, 原始消息数=${rawMessages?.length ?? 0}');
+          
+          final List<Map<String, dynamic>> messages = [];
           
           if (rawMessages != null && rawMessages.isNotEmpty) {
             print('📋 获取到 ${rawMessages.length} 条原始消息记录');
             
             // 将API返回的消息记录转换为消息列表
             // 每条记录包含query和answer，需要转换为两条消息
-            final List<Map<String, dynamic>> messages = [];
-            
             for (final record in rawMessages) {
               final recordMap = record as Map<String, dynamic>;
               final createdAt = recordMap['created_at'] as int?;
@@ -758,13 +774,20 @@ class ChatRemoteDataSource {
             }
             
             print('📋 转换后得到 ${messages.length} 条消息');
-            return messages;
           }
+          
+          return {
+            'messages': messages,
+            'has_more': hasMore,
+          };
         }
       }
       
       print('⚠️ 会话消息响应格式异常');
-      return [];
+      return {
+        'messages': <Map<String, dynamic>>[],
+        'has_more': false,
+      };
     } on DioException catch (e) {
       print('❌ 获取会话消息失败: ${e.message}');
       print('📍 请求URL: ${e.requestOptions.uri}');

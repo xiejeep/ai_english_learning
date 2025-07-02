@@ -7,7 +7,8 @@ import '../providers/chat_state.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_input.dart';
 import '../widgets/conversation_drawer.dart';
-import '../widgets/thinking_indicator.dart';
+import 'package:easy_refresh/easy_refresh.dart';
+
 import '../../../../core/constants/app_constants.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/providers/auth_state.dart';
@@ -22,12 +23,10 @@ class ChatPage extends ConsumerStatefulWidget {
 class _ChatPageState extends ConsumerState<ChatPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  PageController? _pageController;
 
   @override
   void initState() {
     super.initState();
-    // 延迟执行，确保provider已经初始化
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeChat();
     });
@@ -37,7 +36,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
-    _pageController?.dispose();
     super.dispose();
   }
 
@@ -68,18 +66,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
   }
 
-  // void _scrollToBottom() {
-  //   if (_scrollController.hasClients) {
-  //     WidgetsBinding.instance.addPostFrameCallback((_) {
-  //       _scrollController.animateTo(
-  //         _scrollController.position.maxScrollExtent,
-  //         duration: const Duration(milliseconds: 300),
-  //         curve: Curves.easeOut,
-  //       );
-  //     });
-  //   }
-  // }
-
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       title: Consumer(
@@ -90,19 +76,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'AI英语对话',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
               if (currentConversation != null)
                 Text(
                   currentConversation.displayName,
                   style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 16,
+                    color: Colors.white.withValues(alpha: 0.8),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -144,20 +123,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       body: Consumer(
         builder: (context, ref, child) {
           final chatState = ref.watch(chatProvider);
-          
-          // 监听消息变化，自动滚动到底部
-          ref.listen<ChatState>(chatProvider, (previous, next) {
-            if (previous?.messages.length != next.messages.length ||
-                previous?.streamingMessage != next.streamingMessage) {
-              // _scrollToBottom();
-            }
-          });
+
+          // 加载中时显示全屏加载指示器
+          if (chatState.status == ChatStatus.loading) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
 
           return Column(
             children: [
-              // 会话切换指示器
-              if (chatState.status == ChatStatus.loading && chatState.currentConversation != null)
-                _buildConversationSwitchIndicator(),
               // 聊天消息列表
               Expanded(
                 child: _buildMessagesList(chatState),
@@ -191,170 +166,51 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       );
     }
 
-    if (state.conversationPages.isEmpty && state.currentConversation != null) {
+    if (state.messages.isEmpty) {
       return _buildEmptyState();
     }
 
-    if (state.conversationPages.isEmpty) {
-      return _buildEmptyState();
-    }
-
-    return Stack(
-      children: [
-        // PageView显示对话页面
-        PageView.builder(
-          reverse: true,
-          controller: _pageController ??= PageController(initialPage: state.currentPageIndex),
-          onPageChanged: (pageIndex) {
-            ref.read(chatProvider.notifier).onPageChanged(pageIndex);
-            
-            // 如果滑动到最后一页且还有更多消息，自动加载下一页
-            if (pageIndex == state.conversationPages.length - 1 && 
-                ref.read(chatProvider.notifier).canLoadMorePages) {
-              ref.read(chatProvider.notifier).loadMoreMessages();
+    return EasyRefresh(
+      controller: EasyRefreshController(),
+      header: const ClassicHeader(position: IndicatorPosition.locator),
+      footer: const ClassicFooter(position: IndicatorPosition.locator),
+      onLoad: (state.hasMoreMessages && !state.isLoadingMore)
+          ? () async {
+              await ref.read(chatProvider.notifier).loadMoreMessages();
             }
-          },
-          itemCount: state.conversationPages.length,
-          itemBuilder: (context, pageIndex) {
-            final pageMessages = state.conversationPages[pageIndex];
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // 页面指示器
-                  if (state.conversationPages.length > 1)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      child: Center(
-                        child: Text(
-                          '第 ${pageIndex + 1} 页',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ),
-                  // 消息列表
-                  ...pageMessages.map((msg) {
-                    return MessageBubble(
-                      message: msg,
-                      onPlayTTS: msg.isAI ? () {
-                        if (state.isTTSPlaying) {
-                          // 如果正在播放，则停止播放
-                          ref.read(chatProvider.notifier).stopTTS();
-                        } else {
-                          // 否则播放当前消息
-                          ref.read(chatProvider.notifier).playTTS(msg.content);
-                        }
-                      } : null,
-                      onCopy: () => _copyMessageToClipboard(msg.content),
-                      isTTSLoading: state.isTTSLoading,
-                      isCurrentlyPlaying: state.isTTSPlaying,
-                    );
-                  }).toList(),
-                ],
-              ),
-            );
-          },
-        ),
-        // 左侧上一页按钮（加载历史消息）
-        if (state.hasMoreMessages)
-          Positioned(
-            left: 4,
-            top: MediaQuery.of(context).size.height * 0.3,
-            child: _buildNavigationButton(
-              icon: Icons.keyboard_arrow_left,
-              onPressed: state.isLoadingMore ? null : () async {
-                final currentPageCount = state.conversationPages.length;
-                await ref.read(chatProvider.notifier).loadMoreMessages();
-                
-                // 加载完成后，检查是否有新页面被添加
-                final newPageCount = ref.read(chatProvider).conversationPages.length;
-                if (newPageCount > currentPageCount && _pageController != null) {
-                  // 跳转到最后一页（新加载的页面）
-                  _pageController!.animateToPage(
-                    newPageCount - 1,
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  );
-                }
-              },
-              tooltip: '加载历史消息',
-              isLoading: state.isLoadingMore,
+          : null,
+      child: ListView.builder(
+        controller: _scrollController,
+        reverse: true, // 最新消息在底部
+        padding: const EdgeInsets.all(16),
+        itemCount: state.messages.length,
+        itemBuilder: (context, index) {
+          final reversedIndex = state.messages.length - 1 - index;
+          final msg = state.messages[reversedIndex];
+          final isTemporary = msg.isAI &&
+              (msg.content.contains('思考中') ||
+                  msg.content.contains('输入') ||
+                  state.isStreaming && msg == state.messages.last);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: MessageBubble(
+              message: msg,
+              isTemporary: isTemporary,
+              onPlayTTS: msg.isAI
+                  ? () {
+                      if (state.isTTSPlaying) {
+                        ref.read(chatProvider.notifier).stopTTS();
+                      } else {
+                        ref.read(chatProvider.notifier).playTTS(msg.content);
+                      }
+                    }
+                  : null,
+              onCopy: () => _copyMessageToClipboard(msg.content),
+              isTTSLoading: state.isTTSLoading,
+              isCurrentlyPlaying: state.isTTSPlaying,
             ),
-          ),
-        // 右侧下一页按钮（返回较新的页面）
-        if (state.conversationPages.length > 1 && state.currentPageIndex > 0)
-          Positioned(
-            right: 4,
-            top: MediaQuery.of(context).size.height * 0.3,
-            child: _buildNavigationButton(
-              icon: Icons.keyboard_arrow_right,
-              onPressed: () {
-                if (_pageController != null && state.currentPageIndex > 0) {
-                  _pageController!.previousPage(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  );
-                }
-              },
-              tooltip: '返回较新的消息',
-              isLoading: false,
-            ),
-          ),
-      ],
-    );
-  }
-
-  // 构建导航按钮
-  Widget _buildNavigationButton({
-    required IconData icon,
-    required VoidCallback? onPressed,
-    required String tooltip,
-    required bool isLoading,
-  }) {
-    return Container(
-      width: 40,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      child: Tooltip(
-        message: tooltip,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onPressed,
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              height: 40,
-              decoration: BoxDecoration(
-                color: onPressed != null 
-                  ? Colors.blue.withValues(alpha: 0.1)
-                  : Colors.grey.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-            
-              ),
-              child: Center(
-                child: isLoading
-                  ? SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          onPressed != null ? Colors.blue : Colors.grey,
-                        ),
-                      ),
-                    )
-                  : Icon(
-                      icon,
-                      size: 20,
-                      color: onPressed != null ? Colors.blue : Colors.grey,
-                    ),
-              ),
-            ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -382,10 +238,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   margin: const EdgeInsets.symmetric(horizontal: 24),
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4A6FFF).withOpacity(0.05),
+                    color: const Color(0xFF4A6FFF).withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: const Color(0xFF4A6FFF).withOpacity(0.2),
+                      color: const Color(0xFF4A6FFF).withValues(alpha: 0.2),
                       width: 1,
                     ),
                   ),
@@ -436,44 +292,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
   }
 
-  Widget _buildConversationSwitchIndicator() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF4A6FFF).withOpacity(0.1),
-        border: Border(
-          bottom: BorderSide(
-            color: const Color(0xFF4A6FFF).withOpacity(0.2),
-            width: 1,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                const Color(0xFF4A6FFF),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            '正在切换对话...',
-            style: TextStyle(
-              color: const Color(0xFF4A6FFF),
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSuggestedPrompts() {
     final prompts = [
       '那年18,母校舞会,站着如喽啰',
@@ -502,7 +320,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 _messageController.text = prompt;
                 _sendMessage();
               },
-              backgroundColor: const Color(0xFF4A6FFF).withOpacity(0.1),
+              backgroundColor: const Color(0xFF4A6FFF).withValues(alpha: 0.1),
               labelStyle: const TextStyle(
                 color: Color(0xFF4A6FFF),
                 fontWeight: FontWeight.w500,
@@ -526,6 +344,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       hintText: state.currentConversation == null 
         ? '创建会话中...' 
         : '输入你想练习的英语内容...',
+      autofocus: false,
     );
   }
 

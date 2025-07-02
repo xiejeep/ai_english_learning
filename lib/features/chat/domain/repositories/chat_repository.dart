@@ -27,7 +27,7 @@ abstract class ChatRepository {
   Future<List<MessageModel>> getMessages(String conversationId);
   
   // 获取会话消息（带分页参数）
-  Future<List<MessageModel>> getMessagesWithPagination(
+  Future<(List<MessageModel>, bool)> getMessagesWithPagination(
     String conversationId, {
     int? limit,
     String? firstId,

@@ -22,14 +22,9 @@ class ChatState {
   final bool isLoadingMore;
   final bool hasMoreMessages;
   final String? firstId;
-  final int pageSize;
-  final bool hasNewerMessages;
   // TTS状态：简化为只需要加载状态和播放状态
   final bool isTTSLoading;
   final bool isTTSPlaying;
-  // PageView相关属性
-  final List<List<MessageModel>> conversationPages;
-  final int currentPageIndex;
 
   const ChatState({
     this.status = ChatStatus.initial,
@@ -42,12 +37,8 @@ class ChatState {
     this.isLoadingMore = false,
     this.hasMoreMessages = true,
     this.firstId,
-    this.pageSize = 2,
-    this.hasNewerMessages = false,
     this.isTTSLoading = false,
     this.isTTSPlaying = false,
-    this.conversationPages = const [],
-    this.currentPageIndex = 0,
   });
 
   ChatState copyWith({
@@ -61,12 +52,8 @@ class ChatState {
     bool? isLoadingMore,
     bool? hasMoreMessages,
     String? firstId,
-    int? pageSize,
-    bool? hasNewerMessages,
     bool? isTTSLoading,
     bool? isTTSPlaying,
-    List<List<MessageModel>>? conversationPages,
-    int? currentPageIndex,
   }) {
     return ChatState(
       status: status ?? this.status,
@@ -78,13 +65,9 @@ class ChatState {
       autoPlayTTS: autoPlayTTS ?? this.autoPlayTTS,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       hasMoreMessages: hasMoreMessages ?? this.hasMoreMessages,
-      firstId: firstId,
-      pageSize: pageSize ?? this.pageSize,
-      hasNewerMessages: hasNewerMessages ?? this.hasNewerMessages,
+      firstId: firstId ?? this.firstId,
       isTTSLoading: isTTSLoading ?? this.isTTSLoading,
       isTTSPlaying: isTTSPlaying ?? this.isTTSPlaying,
-      conversationPages: conversationPages ?? this.conversationPages,
-      currentPageIndex: currentPageIndex ?? this.currentPageIndex,
     );
   }
 
@@ -162,12 +145,8 @@ class ChatState {
         other.isLoadingMore == isLoadingMore &&
         other.hasMoreMessages == hasMoreMessages &&
         other.firstId == firstId &&
-        other.pageSize == pageSize &&
-        other.hasNewerMessages == hasNewerMessages &&
         other.isTTSLoading == isTTSLoading &&
-        other.isTTSPlaying == isTTSPlaying &&
-        other.conversationPages == conversationPages &&
-        other.currentPageIndex == currentPageIndex;
+        other.isTTSPlaying == isTTSPlaying;
   }
 
   @override
@@ -182,11 +161,7 @@ class ChatState {
         isLoadingMore.hashCode ^
         hasMoreMessages.hashCode ^
         firstId.hashCode ^
-        pageSize.hashCode ^
-        hasNewerMessages.hashCode ^
         isTTSLoading.hashCode ^
-        isTTSPlaying.hashCode ^
-        conversationPages.hashCode ^
-        currentPageIndex.hashCode;
+        isTTSPlaying.hashCode;
   }
 }

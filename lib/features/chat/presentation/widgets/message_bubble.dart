@@ -1,5 +1,3 @@
-
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../shared/models/message_model.dart';
@@ -10,6 +8,7 @@ class MessageBubble extends StatelessWidget {
   final VoidCallback? onCopy;
   final bool isTTSLoading;
   final bool isCurrentlyPlaying;
+  final bool isTemporary;
 
   const MessageBubble({
     Key? key,
@@ -18,6 +17,7 @@ class MessageBubble extends StatelessWidget {
     this.onCopy,
     this.isTTSLoading = false,
     this.isCurrentlyPlaying = false,
+    this.isTemporary = false,
   }) : super(key: key);
 
   // TTS按钮图标逻辑
@@ -62,6 +62,32 @@ class MessageBubble extends StatelessWidget {
     return '播放语音';
   }
 
+  // 构建临时消息的内容（带动画效果）
+  Widget _buildTemporaryMessageContent(String text, Color textColor) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: Text(
+            text,
+            style: TextStyle(color: textColor, fontSize: 16),
+          ),
+        ),
+        if (text.contains('思考中') || text.contains('输入')) ...[
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(textColor.withOpacity(0.7)),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isMe = message.type == MessageType.user;
@@ -94,9 +120,17 @@ class MessageBubble extends StatelessWidget {
               color: bubbleColor,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Text(
-              message.content,
-              style: TextStyle(color: textColor, fontSize: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (isTemporary)
+                  _buildTemporaryMessageContent(message.content, textColor)
+                else
+                  Text(
+                    message.content,
+                    style: TextStyle(color: textColor, fontSize: 16),
+                  ),
+              ],
             ),
           ),
         ),
