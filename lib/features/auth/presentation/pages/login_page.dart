@@ -69,8 +69,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         TextInput.finishAutofillContext();
         // 保存记住账号的设置
         _saveRememberedAccount();
-        // 登录成功，跳转到主页
-        context.go(AppConstants.homeRoute);
+        // 登录成功，直接跳转到聊天页
+        context.go(AppConstants.chatRoute);
       } else if (next.hasError) {
         // 显示错误信息
         _showErrorSnackBar(next.errorMessage ?? '登录失败');

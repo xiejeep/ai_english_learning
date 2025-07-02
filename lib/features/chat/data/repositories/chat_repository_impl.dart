@@ -74,12 +74,12 @@ class ChatRepositoryImpl implements ChatRepository {
   @override
   Future<List<MessageModel>> getMessages(String conversationId) async {
     try {
-      // 首先尝试从远程API获取会话消息
+      // 从远程API获取会话消息
       final messagesData = await _remoteDataSource.getConversationMessages(conversationId);
       
-      // 将API响应转换为MessageModel列表
+      // 将API响应转换为MessageModel
       final messages = messagesData.map((data) {
-        // 处理时间戳转换
+        // 处理时间戳转换（API返回的是秒级时间戳）
         final createdAtTimestamp = data['created_at'];
         DateTime createdAt = DateTime.now();
         if (createdAtTimestamp is int) {
@@ -116,6 +116,80 @@ class ChatRepositoryImpl implements ChatRepository {
       print('从远程API获取会话消息失败，尝试使用本地数据: $e');
       // 如果远程API失败，回退到本地存储
       return await _localDataSource.getMessages(conversationId);
+    }
+  }
+  
+  @override
+  Future<List<MessageModel>> getMessagesWithPagination(
+    String conversationId, {
+    int? limit,
+    String? firstId,
+  }) async {
+    try {
+      // 从远程API获取会话消息（带分页参数）
+      final messagesData = await _remoteDataSource.getConversationMessagesWithPagination(
+        conversationId,
+        limit: limit,
+        firstId: firstId,
+      );
+      
+      // 将API响应转换为MessageModel
+      final messages = messagesData.map((data) {
+        // 处理时间戳转换（API返回的是秒级时间戳）
+        final createdAtTimestamp = data['created_at'];
+        DateTime createdAt = DateTime.now();
+        if (createdAtTimestamp is int) {
+          createdAt = DateTime.fromMillisecondsSinceEpoch(createdAtTimestamp * 1000);
+        } else if (createdAtTimestamp is String) {
+          createdAt = DateTime.tryParse(createdAtTimestamp) ?? DateTime.now();
+        }
+        
+        // 根据role字段确定消息类型
+        final role = data['role'] as String? ?? 'user';
+        final messageType = role == 'assistant' ? MessageType.ai : MessageType.user;
+        
+        return MessageModel(
+          id: data['id'] as String,
+          content: data['content'] as String? ?? '',
+          type: messageType,
+          status: MessageStatus.received,
+          timestamp: createdAt,
+          conversationId: conversationId,
+        );
+      }).toList();
+      
+      // 按时间戳排序，确保消息顺序正确
+      messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      
+      // 将远程获取的消息保存到本地存储
+      for (final message in messages) {
+        await _localDataSource.saveMessage(message);
+      }
+      
+      print('🔄 从远程API获取会话 $conversationId 的分页消息，limit=$limit, firstId=$firstId，共 ${messages.length} 条消息');
+      return messages;
+    } catch (e) {
+      print('从远程API获取分页消息失败，尝试使用本地数据: $e');
+      // 如果远程API失败，回退到本地存储
+      final allMessages = await _localDataSource.getMessages(conversationId);
+      
+      // 在本地进行游标分页处理
+      if (firstId != null || limit != null) {
+        final pageSize = limit ?? 20;
+        
+        if (firstId != null) {
+          // 找到firstId对应的消息位置
+          final startIndex = allMessages.indexWhere((msg) => msg.id == firstId);
+          if (startIndex >= 0) {
+            return allMessages.skip(startIndex).take(pageSize).toList();
+          }
+        }
+        
+        // 如果没有firstId或找不到对应消息，返回前pageSize条
+        return allMessages.take(pageSize).toList();
+      }
+      
+      return allMessages;
     }
   }
   
@@ -201,6 +275,9 @@ class ChatRepositoryImpl implements ChatRepository {
         );
       }).toList();
       
+      // 按更新时间降序排序，确保最新的会话排在前面
+      conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      
       return conversations.cast<Conversation>();
     } catch (e) {
       print('从远程API获取会话列表失败，尝试使用本地数据: $e');
@@ -273,16 +350,54 @@ class ChatRepositoryImpl implements ChatRepository {
   }
   
   @override
-  Stream<String> getTTSAudioStream({
-    required String text,
-    required String messageId,
-    String? voice,
-  }) {
-    return _remoteDataSource.getTTSAudioStream(
-      text: text,
-      messageId: messageId,
-      voice: voice ?? 'default',
-    );
+  Future<Conversation?> getLatestConversation() async {
+    try {
+      // 从远程API获取最新会话
+      final conversationData = await _remoteDataSource.getLatestConversation();
+      
+      if (conversationData == null) {
+        print('⚠️ 没有找到远程会话，尝试本地数据');
+        // 如果没有远程会话，尝试获取本地最新会话
+        final localConversations = await _localDataSource.getConversations();
+        return localConversations.isNotEmpty ? localConversations.first : null;
+      }
+      
+      // 处理时间戳转换（API返回的是秒级时间戳）
+      final createdAtTimestamp = conversationData['created_at'];
+      DateTime createdAt = DateTime.now();
+      if (createdAtTimestamp is int) {
+        createdAt = DateTime.fromMillisecondsSinceEpoch(createdAtTimestamp * 1000);
+      } else if (createdAtTimestamp is String) {
+        createdAt = DateTime.tryParse(createdAtTimestamp) ?? DateTime.now();
+      }
+      
+      final updatedAtTimestamp = conversationData['updated_at'];
+      DateTime updatedAt = DateTime.now();
+      if (updatedAtTimestamp is int) {
+        updatedAt = DateTime.fromMillisecondsSinceEpoch(updatedAtTimestamp * 1000);
+      } else if (updatedAtTimestamp is String) {
+        updatedAt = DateTime.tryParse(updatedAtTimestamp) ?? DateTime.now();
+      }
+      
+      final latestConversation = ConversationModel(
+        id: conversationData['id'] as String,
+        title: conversationData['name'] as String? ?? '新对话',
+        name: conversationData['name'] as String?,
+        introduction: conversationData['introduction'] as String?, // API响应中包含introduction字段
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+        messageCount: 0, // API响应中可能没有消息数量
+        lastMessage: null, // API响应中可能没有最后一条消息
+      );
+      
+      print('✅ 成功获取最新会话: ${latestConversation.displayName}');
+      return latestConversation;
+    } catch (e) {
+      print('从远程API获取最新会话失败，尝试使用本地数据: $e');
+      // 如果远程API失败，回退到本地存储
+      final conversations = await _localDataSource.getConversations();
+      return conversations.isNotEmpty ? conversations.first : null;
+    }
   }
   
   // 生成消息ID
@@ -298,4 +413,4 @@ class ChatRepositoryImpl implements ChatRepository {
     final random = Random().nextInt(999999);
     return 'conv_${timestamp}_$random';
   }
-} 
+}

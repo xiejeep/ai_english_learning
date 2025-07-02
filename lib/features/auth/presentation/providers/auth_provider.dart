@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/network/auth_manager.dart';
 import '../../data/datasources/auth_remote_datasource.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../data/models/auth_request_model.dart';
@@ -22,7 +23,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
 
   AuthNotifier(this._authRepository) : super(const AuthState.initial()) {
+    // 向AuthManager注册token过期处理回调
+    AuthManager.setAuthStateChangedCallback(_handleTokenExpired);
+    
     _checkAuthStatus();
+  }
+
+  // 处理token过期的回调方法
+  void _handleTokenExpired() {
+    print('🔐 [AuthNotifier] 收到token过期通知，更新为未认证状态');
+    state = const AuthState.unauthenticated('登录已过期，请重新登录');
   }
 
   // 检查认证状态

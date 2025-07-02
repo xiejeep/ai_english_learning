@@ -19,6 +19,14 @@ class ChatState {
   final bool isStreaming;
   final String streamingMessage;
   final bool autoPlayTTS;
+  final bool isLoadingMore;
+  final bool hasMoreMessages;
+  final String? firstId;
+  final int pageSize;
+  final bool hasNewerMessages;
+  // PageView相关属性
+  final List<List<MessageModel>> conversationPages;
+  final int currentPageIndex;
 
   const ChatState({
     this.status = ChatStatus.initial,
@@ -28,6 +36,13 @@ class ChatState {
     this.isStreaming = false,
     this.streamingMessage = '',
     this.autoPlayTTS = false,
+    this.isLoadingMore = false,
+    this.hasMoreMessages = true,
+    this.firstId,
+    this.pageSize = 2,
+    this.hasNewerMessages = false,
+    this.conversationPages = const [],
+    this.currentPageIndex = 0,
   });
 
   ChatState copyWith({
@@ -38,6 +53,13 @@ class ChatState {
     bool? isStreaming,
     String? streamingMessage,
     bool? autoPlayTTS,
+    bool? isLoadingMore,
+    bool? hasMoreMessages,
+    String? firstId,
+    int? pageSize,
+    bool? hasNewerMessages,
+    List<List<MessageModel>>? conversationPages,
+    int? currentPageIndex,
   }) {
     return ChatState(
       status: status ?? this.status,
@@ -47,6 +69,13 @@ class ChatState {
       isStreaming: isStreaming ?? this.isStreaming,
       streamingMessage: streamingMessage ?? this.streamingMessage,
       autoPlayTTS: autoPlayTTS ?? this.autoPlayTTS,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      hasMoreMessages: hasMoreMessages ?? this.hasMoreMessages,
+      firstId: firstId ?? this.firstId,
+      pageSize: pageSize ?? this.pageSize,
+      hasNewerMessages: hasNewerMessages ?? this.hasNewerMessages,
+      conversationPages: conversationPages ?? this.conversationPages,
+      currentPageIndex: currentPageIndex ?? this.currentPageIndex,
     );
   }
 
@@ -120,7 +149,14 @@ class ChatState {
         other.error == error &&
         other.isStreaming == isStreaming &&
         other.streamingMessage == streamingMessage &&
-        other.autoPlayTTS == autoPlayTTS;
+        other.autoPlayTTS == autoPlayTTS &&
+        other.isLoadingMore == isLoadingMore &&
+        other.hasMoreMessages == hasMoreMessages &&
+        other.firstId == firstId &&
+        other.pageSize == pageSize &&
+        other.hasNewerMessages == hasNewerMessages &&
+        other.conversationPages == conversationPages &&
+        other.currentPageIndex == currentPageIndex;
   }
 
   @override
@@ -131,6 +167,13 @@ class ChatState {
         error.hashCode ^
         isStreaming.hashCode ^
         streamingMessage.hashCode ^
-        autoPlayTTS.hashCode;
+        autoPlayTTS.hashCode ^
+        isLoadingMore.hashCode ^
+        hasMoreMessages.hashCode ^
+        firstId.hashCode ^
+        pageSize.hashCode ^
+        hasNewerMessages.hashCode ^
+        conversationPages.hashCode ^
+        currentPageIndex.hashCode;
   }
-} 
+}

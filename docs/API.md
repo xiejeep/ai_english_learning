@@ -442,19 +442,55 @@
 - **方法**: `GET`
 - **请求头**: 
   - `Authorization: Bearer <token>`
+- **查询参数**:
+  - `first_id`: string (可选) - 指定起始消息ID，用于cursor分页
+  - `limit`: number (默认: 20) - 每页数量，最大100
 - **响应**:
 ```json
 {
+  "limit": 20,
+  "has_more": true,
   "data": [
     {
       "id": "string",
-      "content": "string",
-      "role": "string",
-      "created_at": "string"
+      "conversation_id": "string",
+      "inputs": {},
+      "query": "string",
+      "answer": "string",
+      "message_files": [
+        {
+          "id": "string",
+          "type": "string",
+          "url": "string",
+          "belongs_to": "user"
+        }
+      ],
+      "feedback": {
+        "rating": "like"
+      },
+      "retriever_resources": [
+        {
+          "position": 123,
+          "dataset_id": "string",
+          "dataset_name": "string",
+          "document_id": "string",
+          "document_name": "string",
+          "segment_id": "string",
+          "score": 123,
+          "content": "string"
+        }
+      ],
+      "created_at": 123
     }
   ]
 }
 ```
+
+**分页说明**:
+- **Cursor分页**: 使用 `first_id` 参数指定起始消息ID进行分页
+- Dify API 仅支持基于 `first_id` 的游标分页，不支持传统的 `page` 参数分页
+- 响应中的 `has_more` 字段表示是否还有更多数据
+- 如果不传 `first_id`，则返回最新的消息
 
 ### 4.11 删除会话
 - **路径**: `/api/dify/conversations/{conversationId}`
@@ -773,3 +809,5 @@ GET /api/auth/login-status?email=user@example.com
   "path": "string"
 }
 ```
+
+可以使用账号 278245181@qq.com 密码123456Aa测试

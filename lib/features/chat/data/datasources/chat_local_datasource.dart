@@ -88,9 +88,14 @@ class ChatLocalDataSource {
       if (conversationsStr == null) return [];
       
       final conversationsList = jsonDecode(conversationsStr) as List;
-      return conversationsList
+      final conversations = conversationsList
           .map((json) => ConversationModel.fromJson(json as Map<String, dynamic>))
           .toList();
+      
+      // 按更新时间降序排序，确保最新的会话排在前面
+      conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      
+      return conversations;
     } catch (e) {
       print('获取会话列表失败: $e');
       return [];

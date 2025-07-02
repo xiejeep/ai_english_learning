@@ -76,6 +76,14 @@ class StorageService {
     await _storage.remove(AppConstants.userInfoKey);
   }
   
+  // 新增：同步清除所有认证数据（用于拦截器）
+  static void clearAuthDataSync() {
+    _storage.remove(AppConstants.tokenKey);
+    _storage.remove('${AppConstants.tokenKey}_refresh');
+    _storage.remove('${AppConstants.tokenKey}_expiry');
+    _storage.remove(AppConstants.userInfoKey);
+  }
+  
   // 聊天会话相关
   static Future<void> saveConversations(List<Map<String, dynamic>> conversations) async {
     await _storage.write(AppConstants.conversationsKey, conversations);

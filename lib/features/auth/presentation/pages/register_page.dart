@@ -43,7 +43,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (next.isAuthenticated) {
-        context.go(AppConstants.homeRoute);
+        context.go(AppConstants.chatRoute);
       } else if (next.hasError) {
         _showErrorSnackBar(next.errorMessage ?? '注册失败');
       }

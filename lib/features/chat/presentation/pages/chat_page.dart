@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/chat_provider.dart';
 import '../providers/chat_state.dart';
 import '../widgets/message_bubble.dart';
@@ -7,6 +9,8 @@ import '../widgets/message_input.dart';
 import '../widgets/conversation_drawer.dart';
 import '../widgets/thinking_indicator.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../auth/presentation/providers/auth_state.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key});
@@ -18,6 +22,7 @@ class ChatPage extends ConsumerStatefulWidget {
 class _ChatPageState extends ConsumerState<ChatPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  PageController? _pageController;
 
   @override
   void initState() {
@@ -32,30 +37,48 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _pageController?.dispose();
     super.dispose();
   }
 
-  void _initializeChat() {
-    final chatNotifier = ref.read(chatProvider.notifier);
-    final state = ref.read(chatProvider);
-    
-    // 如果没有当前会话，创建一个新会话
-    if (state.currentConversation == null) {
-      chatNotifier.createNewConversation();
+  void _initializeChat() async {
+    try {
+      print('🚀 [ChatPage] 开始初始化聊天...');
+      
+      final chatNotifier = ref.read(chatProvider.notifier);
+      
+      // 直接加载最新会话（使用limit=1优化）
+      await chatNotifier.loadLatestConversation();
+      
+      // 检查是否成功加载了会话
+      final chatState = ref.read(chatProvider);
+      if (chatState.currentConversation == null) {
+        // 如果没有找到会话，创建一个新会话
+        print('📝 [ChatPage] 没有找到现有会话，创建新会话...');
+        await chatNotifier.createNewConversation();
+        print('✅ [ChatPage] 成功创建新会话');
+      } else {
+        print('✅ [ChatPage] 成功加载最新会话: ${chatState.currentConversation!.displayName}');
+      }
+    } catch (e) {
+      print('❌ [ChatPage] 初始化聊天失败: $e');
+      // 如果加载失败，回退到创建新会话
+      final chatNotifier = ref.read(chatProvider.notifier);
+      await chatNotifier.createNewConversation();
     }
   }
 
-  void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      });
-    }
-  }
+  // void _scrollToBottom() {
+  //   if (_scrollController.hasClients) {
+  //     WidgetsBinding.instance.addPostFrameCallback((_) {
+  //       _scrollController.animateTo(
+  //         _scrollController.position.maxScrollExtent,
+  //         duration: const Duration(milliseconds: 300),
+  //         curve: Curves.easeOut,
+  //       );
+  //     });
+  //   }
+  // }
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
@@ -90,18 +113,31 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       ),
       backgroundColor: const Color(0xFF4A6FFF),
       foregroundColor: Colors.white,
-      elevation: 0,
-      actions: [
-        IconButton(
-          onPressed: () => _showChatOptions(context),
-          icon: const Icon(Icons.more_vert),
-        ),
-      ],
+      elevation: 0
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    // 监听认证状态变化，处理登录过期
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      if (next.isUnauthenticated && next.errorMessage?.contains('登录已过期') == true) {
+        // 显示登录过期提示
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('登录已过期，请重新登录'),
+            backgroundColor: Colors.orange.shade600,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        
+        // 跳转到登录页面
+        context.go(AppConstants.loginRoute);
+        print('✅ [ChatPage] 检测到登录过期，已跳转到登录页面');
+      }
+    });
+
     return Scaffold(
       appBar: _buildAppBar(),
       drawer: const ConversationDrawer(),
@@ -113,7 +149,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           ref.listen<ChatState>(chatProvider, (previous, next) {
             if (previous?.messages.length != next.messages.length ||
                 previous?.streamingMessage != next.streamingMessage) {
-              _scrollToBottom();
+              // _scrollToBottom();
             }
           });
 
@@ -155,33 +191,164 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       );
     }
 
-    if (state.messages.isEmpty && state.currentConversation != null) {
+    if (state.conversationPages.isEmpty && state.currentConversation != null) {
       return _buildEmptyState();
     }
 
-    // 计算列表项目数量，如果正在思考则+1
-    final itemCount = state.messages.length + (state.status == ChatStatus.thinking ? 1 : 0);
-    
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.all(16),
-      itemCount: itemCount,
-      itemBuilder: (context, index) {
-        // 如果是最后一项且正在思考，显示思考指示器
-        if (index == state.messages.length && state.status == ChatStatus.thinking) {
-          return const ThinkingIndicator();
-        }
-        
-        final message = state.messages[index];
-        
-        return MessageBubble(
-          message: message,
-          onPlayTTS: message.isAI 
-            ? () => ref.read(chatProvider.notifier).playTTS(message.content)
-            : null,
-          onDelete: () => ref.read(chatProvider.notifier).deleteMessage(message.id),
-        );
-      },
+    if (state.conversationPages.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return Stack(
+      children: [
+        // PageView显示对话页面
+        PageView.builder(
+          reverse: true,
+          controller: _pageController ??= PageController(initialPage: state.currentPageIndex),
+          onPageChanged: (pageIndex) {
+            ref.read(chatProvider.notifier).onPageChanged(pageIndex);
+            
+            // 如果滑动到最后一页且还有更多消息，自动加载下一页
+            if (pageIndex == state.conversationPages.length - 1 && 
+                ref.read(chatProvider.notifier).canLoadMorePages) {
+              ref.read(chatProvider.notifier).loadMoreMessages();
+            }
+          },
+          itemCount: state.conversationPages.length,
+          itemBuilder: (context, pageIndex) {
+            final pageMessages = state.conversationPages[pageIndex];
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 页面指示器
+                  if (state.conversationPages.length > 1)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      child: Center(
+                        child: Text(
+                          '第 ${pageIndex + 1} 页',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  // 消息列表
+                  ...pageMessages.map((msg) => MessageBubble(
+                    message: msg,
+                    onPlayTTS: msg.isAI ? () => ref.read(chatProvider.notifier).playTTS(msg.content) : null,
+                    onCopy: () => _copyMessageToClipboard(msg.content),
+                  )).toList(),
+                ],
+              ),
+            );
+          },
+        ),
+        // 左侧上一页按钮（加载历史消息）
+        if (state.hasMoreMessages)
+          Positioned(
+            left: 4,
+            top: MediaQuery.of(context).size.height * 0.3,
+            child: _buildNavigationButton(
+              icon: Icons.keyboard_arrow_left,
+              onPressed: state.isLoadingMore ? null : () async {
+                final currentPageCount = state.conversationPages.length;
+                await ref.read(chatProvider.notifier).loadMoreMessages();
+                
+                // 加载完成后，检查是否有新页面被添加
+                final newPageCount = ref.read(chatProvider).conversationPages.length;
+                if (newPageCount > currentPageCount && _pageController != null) {
+                  // 跳转到最后一页（新加载的页面）
+                  _pageController!.animateToPage(
+                    newPageCount - 1,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                }
+              },
+              tooltip: '加载历史消息',
+              isLoading: state.isLoadingMore,
+            ),
+          ),
+        // 右侧下一页按钮（返回较新的页面）
+        if (state.conversationPages.length > 1 && state.currentPageIndex > 0)
+          Positioned(
+            right: 4,
+            top: MediaQuery.of(context).size.height * 0.3,
+            child: _buildNavigationButton(
+              icon: Icons.keyboard_arrow_right,
+              onPressed: () {
+                if (_pageController != null && state.currentPageIndex > 0) {
+                  _pageController!.previousPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                }
+              },
+              tooltip: '返回较新的消息',
+              isLoading: false,
+            ),
+          ),
+      ],
+    );
+  }
+
+  // 构建导航按钮
+  Widget _buildNavigationButton({
+    required IconData icon,
+    required VoidCallback? onPressed,
+    required String tooltip,
+    required bool isLoading,
+  }) {
+    return Container(
+      width: 40,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      child: Tooltip(
+        message: tooltip,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onPressed,
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              height: 40,
+              decoration: BoxDecoration(
+                color: onPressed != null 
+                  ? Colors.blue.withValues(alpha: 0.1)
+                  : Colors.grey.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: onPressed != null 
+                    ? Colors.blue.withValues(alpha: 0.3)
+                    : Colors.grey.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              child: Center(
+                child: isLoading
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          onPressed != null ? Colors.blue : Colors.grey,
+                        ),
+                      ),
+                    )
+                  : Icon(
+                      icon,
+                      size: 20,
+                      color: onPressed != null ? Colors.blue : Colors.grey,
+                    ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -366,126 +533,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _messageController.clear();
   }
 
-  void _showChatOptions(BuildContext context) {
-    final chatState = ref.read(chatProvider);
-    
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.add),
-              title: const Text('新建对话'),
-              onTap: () {
-                Navigator.pop(context);
-                ref.read(chatProvider.notifier).createNewConversation();
-              },
-            ),
-            ListTile(
-              leading: Icon(
-                chatState.autoPlayTTS ? Icons.volume_up : Icons.volume_off,
-              ),
-              title: Text(
-                chatState.autoPlayTTS ? '关闭自动朗读' : '开启自动朗读',
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                ref.read(chatProvider.notifier).toggleTTSAutoPlay();
-              },
-            ),
-            if (chatState.currentConversation != null)
-              ListTile(
-                leading: const Icon(Icons.edit),
-                title: const Text('重命名对话'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showRenameDialog();
-                },
-              ),
-            if (chatState.currentConversation != null)
-              ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('删除对话', style: TextStyle(color: Colors.red)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showDeleteDialog();
-                },
-              ),
-          ],
-        ),
+  // 复制消息到剪贴板
+  void _copyMessageToClipboard(String content) {
+    Clipboard.setData(ClipboardData(text: content));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('消息已复制到剪贴板'),
+        duration: Duration(seconds: 2),
       ),
     );
   }
-
-  void _showRenameDialog() {
-    final currentConversation = ref.read(chatProvider).currentConversation;
-    if (currentConversation == null) return;
-
-    final controller = TextEditingController(text: currentConversation.title);
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('重命名对话'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: '输入新的对话名称',
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              final newTitle = controller.text.trim();
-              if (newTitle.isNotEmpty) {
-                ref.read(chatProvider.notifier).updateConversationTitle(
-                  currentConversation.id,
-                  newTitle,
-                );
-              }
-              Navigator.pop(context);
-            },
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDeleteDialog() {
-    final currentConversation = ref.read(chatProvider).currentConversation;
-    if (currentConversation == null) return;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('删除对话'),
-        content: const Text('确定要删除这个对话吗？此操作不可撤销。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              ref.read(chatProvider.notifier).deleteConversation(currentConversation.id);
-              Navigator.pop(context);
-              // 返回主页
-              Navigator.pushReplacementNamed(context, AppConstants.homeRoute);
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
-    );
-  }
-} 
+}

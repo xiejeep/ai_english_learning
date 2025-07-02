@@ -23,8 +23,15 @@ abstract class ChatRepository {
   // 停止AI回复
   Future<void> stopGeneration();
   
-  // 获取会话消息列表
+  // 获取会话的所有消息
   Future<List<MessageModel>> getMessages(String conversationId);
+  
+  // 获取会话消息（带分页参数）
+  Future<List<MessageModel>> getMessagesWithPagination(
+    String conversationId, {
+    int? limit,
+    String? firstId,
+  });
   
   // 保存消息到本地
   Future<void> saveMessage(MessageModel message);
@@ -38,6 +45,9 @@ abstract class ChatRepository {
   // 获取会话列表
   Future<List<Conversation>> getConversations();
   
+  // 获取最新会话
+  Future<Conversation?> getLatestConversation();
+  
   // 删除会话
   Future<void> deleteConversation(String conversationId);
   
@@ -47,13 +57,6 @@ abstract class ChatRepository {
   // 更新会话名称
   Future<void> updateConversationName(String conversationId, String name);
   
-  // 获取TTS音频URL
+  // 获取TTS音频文件路径
   Future<String> getTTSAudio(String text);
-  
-  // 获取流式TTS音频数据
-  Stream<String> getTTSAudioStream({
-    required String text,
-    required String messageId,
-    String voice,
-  });
-} 
+}

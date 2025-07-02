@@ -33,8 +33,8 @@ class _SplashScreenState extends State<SplashScreen> {
     
     if (mounted) {
       if (token != null) {
-        // 已登录，跳转到主页
-        context.go(AppConstants.homeRoute);
+        // 已登录，直接跳转到聊天页
+        context.go(AppConstants.chatRoute);
       } else {
         // 未登录，跳转到登录页
         context.go(AppConstants.loginRoute);
@@ -324,8 +324,8 @@ class AppRouter {
             ),
             const SizedBox(height: 32),
             ElevatedButton(
-              onPressed: () => context.go(AppConstants.homeRoute),
-              child: const Text('返回首页'),
+              onPressed: () => context.go(AppConstants.chatRoute),
+              child: const Text('进入聊天'),
             ),
           ],
         ),
