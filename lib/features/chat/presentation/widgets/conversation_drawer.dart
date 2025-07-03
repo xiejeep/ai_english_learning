@@ -6,6 +6,8 @@ import '../providers/conversation_list_provider.dart';
 import '../../domain/entities/conversation.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../auth/presentation/providers/credits_provider.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import 'package:go_router/go_router.dart';
 
 class ConversationDrawer extends ConsumerStatefulWidget {
   const ConversationDrawer({super.key});
@@ -36,11 +38,11 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
         children: [
           _buildDrawerHeader(),
           _buildNewConversationTile(),
-          const Divider(),
+
           Expanded(
             child: _buildConversationsList(),
           ),
-          const Divider(),
+
           _buildDrawerFooter(),
         ],
       ),
@@ -313,8 +315,17 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
           ],
         ),
         onTap: () async {
-          Navigator.pop(context); // 关闭抽屉
-          await ref.read(chatProvider.notifier).switchToConversation(conversation);
+          final currentConversationId = ref.read(chatProvider).currentConversation?.id;
+          if (currentConversationId == conversation.id) {
+            // 如果已是当前会话，只关闭抽屉
+            FocusScope.of(context).unfocus();
+            Navigator.pop(context);
+          } else {
+            // 切换会话前先unfocus并关闭抽屉
+            FocusScope.of(context).unfocus();
+            Navigator.pop(context);
+            await ref.read(chatProvider.notifier).switchToConversation(conversation);
+          }
         },
       ),
     );
@@ -324,19 +335,54 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
     return Consumer(
       builder: (context, ref, child) {
         return Container(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              const SizedBox(height: 8),
-              Text(
-                '趣TALK伙伴 v${AppConstants.appVersion}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade500,
+          padding: const EdgeInsets.symmetric(horizontal: 16,vertical: 5),
+          child:  Builder(
+                builder: (context) => SizedBox(
+                  width: double.infinity,
+                  child: SafeArea(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.logout, size: 18),
+                      label: const Text('退出登录'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onPressed: () async {
+                        // 先弹出确认对话框
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('确认退出登录'),
+                            content: const Text('确定要退出登录吗？'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(false),
+                                child: const Text('取消'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(true),
+                                child: const Text('确定'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm != true) return;
+                        // 调用Provider退出登录
+                        final ref = Navigator.of(context).context.findAncestorStateOfType<ConsumerState>()?.ref;
+                        if (ref != null) {
+                          await ref.read(authProvider.notifier).logout();
+                          if (context.mounted) {
+                            Navigator.of(context).pop(); // 关闭抽屉
+                            // 使用go_router跳转，避免pushReplacementNamed报错
+                            context.go(AppConstants.loginRoute);
+                          }
+                        }
+                      },
+                    ),
+                  ),
                 ),
               ),
-            ],
-          ),
         );
       },
     );

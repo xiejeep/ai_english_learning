@@ -203,7 +203,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       child: ListView.builder(
         controller: _scrollController,
         reverse: true, // 最新消息在底部
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 8,vertical: 10),
         itemCount: state.messages.length,
         itemBuilder: (context, index) {
           final reversedIndex = state.messages.length - 1 - index;
@@ -367,6 +367,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   void _sendMessage() {
     final content = _messageController.text.trim();
     if (content.isEmpty) return;
+
+    // 先收起键盘
+    FocusScope.of(context).unfocus();
 
     // 发送消息
     ref.read(chatProvider.notifier).sendMessageStream(content);

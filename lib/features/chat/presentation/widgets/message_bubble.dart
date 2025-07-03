@@ -26,7 +26,7 @@ class MessageBubble extends StatelessWidget {
     }
     await _flutterTts.stop(); // 保证状态干净
     await _flutterTts.setLanguage('en-US');
-    await _flutterTts.setSpeechRate(0.45);
+    await _flutterTts.setSpeechRate(0.35);
     await _flutterTts.setVolume(1.0);
     await _flutterTts.setPitch(1.0);
     var isAvailable = await _flutterTts.isLanguageAvailable('en-US');
@@ -146,7 +146,7 @@ class MessageBubble extends StatelessWidget {
     return '播放语音';
   }
 
-  // 构建临时消息的内容（带动画效果）
+  // 构建临时消息的内容（去除加载动画）
   Widget _buildTemporaryMessageContent(String text, Color textColor) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -157,17 +157,7 @@ class MessageBubble extends StatelessWidget {
             style: TextStyle(color: textColor, fontSize: 16),
           ),
         ),
-        if (text.contains('思考中') || text.contains('输入')) ...[
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(textColor.withOpacity(0.7)),
-            ),
-          ),
-        ],
+        // 移除加载动画
       ],
     );
   }
@@ -189,18 +179,14 @@ class MessageBubble extends StatelessWidget {
     return Column(
       crossAxisAlignment: align,
       children: [
-        isMe
-            ? GestureDetector(
-                onTap: () {
-                  context.push(AppConstants.profileRoute);
-                },
-                child: avatar,
-              )
-            : avatar,
-        const SizedBox(height: 4),
         Row(
           mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (!isMe) ...[
+              avatar,
+              const SizedBox(width: 8),
+            ],
             Flexible(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
@@ -210,10 +196,8 @@ class MessageBubble extends StatelessWidget {
                 child: IntrinsicWidth(
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    margin: EdgeInsets.only(
-                      left: isMe ? 0 : 16,
-                      right: isMe ? 16 : 0,
-                    ),
+                    
+                 
                     decoration: BoxDecoration(
                       color: bubbleColor,
                       borderRadius: BorderRadius.circular(16),
@@ -272,12 +256,22 @@ class MessageBubble extends StatelessWidget {
                 ),
               ),
             ),
+            if (isMe) ...[
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () {
+                  context.push(AppConstants.profileRoute);
+                },
+                child: avatar,
+              ),
+            ],
           ],
         ),
         if (onPlayTTS != null || onCopy != null)
           Row(
             mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
             children: [
+              const SizedBox(width: 30),
               if (onPlayTTS != null)
                 IconButton(
                   icon: Icon(
