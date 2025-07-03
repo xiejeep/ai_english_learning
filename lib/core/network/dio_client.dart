@@ -98,16 +98,42 @@ class DioClient {
 }
 
 class RetryInterceptor extends Interceptor {
+  static const int maxRetries = 2; // 最多重试2次
+  
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
-    if (_shouldRetry(err)) {
+    if (_shouldRetry(err) && _getRetryCount(err.requestOptions) < maxRetries) {
       try {
+        print('🔄 网络请求失败，开始重试... (第${_getRetryCount(err.requestOptions) + 1}次)');
         final response = await _retry(err.requestOptions);
+        print('✅ 重试成功');
         handler.resolve(response);
         return;
       } catch (e) {
+        print('❌ 重试失败: $e');
         // 重试失败，继续抛出原始错误
       }
+    }
+    
+    // 添加更友好的错误信息
+    if (err.type == DioExceptionType.connectionTimeout) {
+      err = DioException(
+        requestOptions: err.requestOptions,
+        type: err.type,
+        message: '连接超时，请检查网络连接',
+      );
+    } else if (err.type == DioExceptionType.receiveTimeout) {
+      err = DioException(
+        requestOptions: err.requestOptions,
+        type: err.type,
+        message: '接收数据超时，请稍后重试',
+      );
+    } else if (err.type == DioExceptionType.connectionError) {
+      err = DioException(
+        requestOptions: err.requestOptions,
+        type: err.type,
+        message: '网络连接失败，请检查网络设置',
+      );
     }
     
     handler.next(err);
@@ -117,14 +143,27 @@ class RetryInterceptor extends Interceptor {
     return err.type == DioExceptionType.connectionTimeout ||
            err.type == DioExceptionType.receiveTimeout ||
            err.type == DioExceptionType.sendTimeout ||
+           err.type == DioExceptionType.connectionError ||
            (err.response?.statusCode != null && 
             err.response!.statusCode! >= 500);
   }
   
+  int _getRetryCount(RequestOptions options) {
+    return options.extra['retry_count'] ?? 0;
+  }
+  
   Future<Response> _retry(RequestOptions requestOptions) async {
+    // 增加重试计数
+    final retryCount = _getRetryCount(requestOptions) + 1;
+    requestOptions.extra['retry_count'] = retryCount;
+    
+    // 添加重试延迟
+    await Future.delayed(Duration(milliseconds: 500 * retryCount));
+    
     final options = Options(
       method: requestOptions.method,
       headers: requestOptions.headers,
+      extra: requestOptions.extra,
     );
     
     return DioClient.instance.request(

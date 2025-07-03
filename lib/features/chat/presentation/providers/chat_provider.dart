@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../data/datasources/chat_remote_datasource.dart';
-import '../../data/datasources/chat_local_datasource.dart';
 import '../../data/repositories/chat_repository_impl.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../../../../shared/models/message_model.dart';
@@ -17,14 +16,9 @@ final chatRemoteDataSourceProvider = Provider<ChatRemoteDataSource>((ref) {
   return ChatRemoteDataSource();
 });
 
-final chatLocalDataSourceProvider = Provider<ChatLocalDataSource>((ref) {
-  return ChatLocalDataSource();
-});
-
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   final remoteDataSource = ref.read(chatRemoteDataSourceProvider);
-  final localDataSource = ref.read(chatLocalDataSourceProvider);
-  return ChatRepositoryImpl(remoteDataSource, localDataSource);
+  return ChatRepositoryImpl(remoteDataSource);
 });
 
 // 聊天状态管理器
@@ -410,22 +404,21 @@ class ChatNotifier extends StateNotifier<ChatState> {
           );
         },
         onDone: () async {
-          // 流式响应完成，保存最终的AI消息
-          final finalAiMessage = tempAiMessage.copyWith(
-            content: fullResponse,
-            status: MessageStatus.received,
-          );
-
-          await _repository.saveMessage(finalAiMessage);
-
-          // 更新最终消息
+          // 流式响应完成，直接替换临时AI消息内容和状态，不再插入新气泡
           final updatedMessages = state.messages.map((msg) {
             if (msg.id == tempAiMessage.id) {
-              return finalAiMessage;
+              return msg.copyWith(
+                content: fullResponse,
+                status: MessageStatus.received,
+              );
             }
             return msg;
           }).toList();
-          
+
+          await _repository.saveMessage(
+            tempAiMessage.copyWith(content: fullResponse, status: MessageStatus.received),
+          );
+
           state = state.copyWith(
             messages: updatedMessages,
             status: ChatStatus.success,
@@ -729,6 +722,60 @@ class ChatNotifier extends StateNotifier<ChatState> {
     _audioPlayer?.dispose();
     _audioPlayer = null;
     super.dispose();
+  }
+
+  // 初始化聊天，加载最新会话
+  Future<void> initializeChat() async {
+    try {
+      print('🚀 [ChatPage] 开始初始化聊天...');
+      
+      state = state.copyWith(
+        status: ChatStatus.loading,
+        error: null,
+      );
+
+      // 直接尝试获取最新会话，不使用本地回退
+      final latestConversation = await _repository.getLatestConversation();
+      
+      if (latestConversation != null) {
+        print('✅ 找到最新会话: ${latestConversation.id}');
+        await switchToConversation(latestConversation);
+      } else {
+        print('⚠️ 未找到任何会话，准备开始新对话');
+        state = state.copyWith(
+          currentConversation: null,
+          messages: [],
+          status: ChatStatus.initial,
+        );
+      }
+    } catch (e) {
+      print('❌ 初始化聊天失败: $e');
+      
+      // 根据错误类型提供不同的用户提示
+      String userFriendlyError = _getUserFriendlyError(e);
+      
+      state = state.copyWith(
+        status: ChatStatus.error,
+        error: userFriendlyError,
+      );
+    }
+  }
+
+  // 将技术错误信息转换为用户友好的提示
+  String _getUserFriendlyError(dynamic error) {
+    final errorString = error.toString().toLowerCase();
+    
+    if (errorString.contains('connection') || errorString.contains('timeout')) {
+      return '网络连接失败，请检查网络设置后重试';
+    } else if (errorString.contains('server') || errorString.contains('500')) {
+      return '服务器暂时无法响应，请稍后重试';
+    } else if (errorString.contains('unauthorized') || errorString.contains('401')) {
+      return '登录已过期，请重新登录';
+    } else if (errorString.contains('forbidden') || errorString.contains('403')) {
+      return '访问权限不足，请联系管理员';
+    } else {
+      return '连接服务器失败，请检查网络连接';
+    }
   }
 }
 

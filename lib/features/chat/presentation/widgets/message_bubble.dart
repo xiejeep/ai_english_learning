@@ -107,32 +107,43 @@ class MessageBubble extends StatelessWidget {
       children: [
         avatar,
         const SizedBox(height: 4),
-        FractionallySizedBox(
-          alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-          widthFactor: 0.95, // 最大宽度为85%
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            margin: EdgeInsets.only(
-              left: isMe ? 0 : 16,
-              right: isMe ? 16 : 0,
-            ),
-            decoration: BoxDecoration(
-              color: bubbleColor,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (isTemporary)
-                  _buildTemporaryMessageContent(message.content, textColor)
-                else
-                  Text(
-                    message.content,
-                    style: TextStyle(color: textColor, fontSize: 16),
+        Row(
+          mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          children: [
+            Flexible(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.8,
+                  minWidth: 36,
+                ),
+                child: IntrinsicWidth(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    margin: EdgeInsets.only(
+                      left: isMe ? 0 : 16,
+                      right: isMe ? 16 : 0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: bubbleColor,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (isTemporary)
+                          _buildTemporaryMessageContent(message.content, textColor)
+                        else
+                          Text(
+                            message.content,
+                            style: TextStyle(color: textColor, fontSize: 16),
+                          ),
+                      ],
+                    ),
                   ),
-              ],
+                ),
+              ),
             ),
-          ),
+          ],
         ),
         if (onPlayTTS != null || onCopy != null)
           Row(

@@ -128,12 +128,58 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
         final conversationListState = ref.watch(conversationListProvider);
         final chatState = ref.watch(chatProvider);
         
+        // 加载中状态
         if (conversationListState.isLoading && conversationListState.conversations.isEmpty) {
           return const Center(
             child: CircularProgressIndicator(),
           );
         }
 
+        // 错误状态
+        if (conversationListState.error != null) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Colors.grey.shade400,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    conversationListState.error!,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      ref.read(conversationListProvider.notifier).loadConversations();
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('重试'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppConstants.primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 10,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // 空状态
         if (conversationListState.conversations.isEmpty) {
           return Center(
             child: Column(
@@ -309,7 +355,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
               ),
               const SizedBox(height: 8),
               Text(
-                'AI English Learning v${AppConstants.appVersion}',
+                '趣TALK伙伴 v${AppConstants.appVersion}',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey.shade500,

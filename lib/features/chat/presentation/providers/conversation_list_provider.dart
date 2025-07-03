@@ -3,7 +3,6 @@ import '../../domain/entities/conversation.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../../data/repositories/chat_repository_impl.dart';
 import '../../data/datasources/chat_remote_datasource.dart';
-import '../../data/datasources/chat_local_datasource.dart';
 
 // 会话列表状态
 class ConversationListState {
@@ -65,7 +64,27 @@ class ConversationListNotifier extends StateNotifier<ConversationListState> {
       state = state.setSuccess(conversations);
     } catch (e) {
       print('❌ [会话列表] 加载会话列表失败: $e');
-      state = state.setError('加载会话列表失败: $e');
+      
+      // 根据错误类型提供友好的用户提示
+      String userFriendlyError = _getUserFriendlyError(e);
+      state = state.setError(userFriendlyError);
+    }
+  }
+
+  // 将技术错误信息转换为用户友好的提示
+  String _getUserFriendlyError(dynamic error) {
+    final errorString = error.toString().toLowerCase();
+    
+    if (errorString.contains('connection') || errorString.contains('timeout')) {
+      return '网络连接失败，请检查网络设置后重试';
+    } else if (errorString.contains('server') || errorString.contains('500')) {
+      return '服务器暂时无法响应，请稍后重试';
+    } else if (errorString.contains('unauthorized') || errorString.contains('401')) {
+      return '登录已过期，请重新登录';
+    } else if (errorString.contains('forbidden') || errorString.contains('403')) {
+      return '访问权限不足，请联系管理员';
+    } else {
+      return '连接服务器失败，请检查网络连接';
     }
   }
 
@@ -84,7 +103,9 @@ class ConversationListNotifier extends StateNotifier<ConversationListState> {
       print('✅ [会话列表] 会话删除成功: $conversationId');
     } catch (e) {
       print('❌ [会话列表] 删除会话失败: $e');
-      state = state.setError('删除会话失败: $e');
+      
+      String userFriendlyError = _getUserFriendlyError(e);
+      state = state.setError(userFriendlyError);
     }
   }
 
@@ -106,7 +127,9 @@ class ConversationListNotifier extends StateNotifier<ConversationListState> {
       print('✅ [会话列表] 会话标题更新成功: $conversationId -> $title');
     } catch (e) {
       print('❌ [会话列表] 更新会话标题失败: $e');
-      state = state.setError('更新会话标题失败: $e');
+      
+      String userFriendlyError = _getUserFriendlyError(e);
+      state = state.setError(userFriendlyError);
     }
   }
 
@@ -128,7 +151,9 @@ class ConversationListNotifier extends StateNotifier<ConversationListState> {
       print('✅ [会话列表] 会话名称更新成功: $conversationId -> $name');
     } catch (e) {
       print('❌ [会话列表] 更新会话名称失败: $e');
-      state = state.setError('更新会话名称失败: $e');
+      
+      String userFriendlyError = _getUserFriendlyError(e);
+      state = state.setError(userFriendlyError);
     }
   }
 
@@ -148,8 +173,7 @@ class ConversationListNotifier extends StateNotifier<ConversationListState> {
 // Provider 依赖定义
 final conversationListRepositoryProvider = Provider<ChatRepository>((ref) {
   final remoteDataSource = ChatRemoteDataSource();
-  final localDataSource = ChatLocalDataSource();
-  return ChatRepositoryImpl(remoteDataSource, localDataSource);
+  return ChatRepositoryImpl(remoteDataSource);
 });
 
 // Provider 定义

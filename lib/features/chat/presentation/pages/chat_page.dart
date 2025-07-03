@@ -40,30 +40,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   void _initializeChat() async {
-    try {
-      print('🚀 [ChatPage] 开始初始化聊天...');
-      
-      final chatNotifier = ref.read(chatProvider.notifier);
-      
-      // 直接加载最新会话（使用limit=1优化）
-      await chatNotifier.loadLatestConversation();
-      
-      // 检查是否成功加载了会话
-      final chatState = ref.read(chatProvider);
-      if (chatState.currentConversation == null) {
-        // 如果没有找到会话，创建一个新会话
-        print('📝 [ChatPage] 没有找到现有会话，创建新会话...');
-        await chatNotifier.createNewConversation();
-        print('✅ [ChatPage] 成功创建新会话');
-      } else {
-        print('✅ [ChatPage] 成功加载最新会话: ${chatState.currentConversation!.displayName}');
-      }
-    } catch (e) {
-      print('❌ [ChatPage] 初始化聊天失败: $e');
-      // 如果加载失败，回退到创建新会话
-      final chatNotifier = ref.read(chatProvider.notifier);
-      await chatNotifier.createNewConversation();
-    }
+    // 使用provider中的初始化方法，包含更好的错误处理
+    await ref.read(chatProvider.notifier).initializeChat();
   }
 
   PreferredSizeWidget _buildAppBar() {
@@ -129,6 +107,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             return const Center(
               child: CircularProgressIndicator(),
             );
+          }
+
+          // 网络错误时显示友好的错误界面
+          if (chatState.status == ChatStatus.error) {
+            return _buildErrorWidget(chatState.error ?? '未知错误');
           }
 
           return Column(
@@ -366,6 +349,47 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       const SnackBar(
         content: Text('消息已复制到剪贴板'),
         duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget(String error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.wifi_off,
+              size: 80,
+              color: Colors.grey.shade400,
+            ),
+            const SizedBox(height: 24),
+            Text(
+              error,
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey.shade700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: _initializeChat,
+              icon: const Icon(Icons.refresh),
+              label: const Text('重试'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppConstants.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,4 +1,4 @@
-# AI English Learning App 🤖📚
+# 趣TALK伙伴 App 🤖📚
 
 > Flutter AI英语学习应用 - 基于Dify API的智能英语学习助手
 
