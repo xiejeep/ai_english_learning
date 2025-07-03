@@ -70,7 +70,45 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       ),
       backgroundColor: const Color(0xFF4A6FFF),
       foregroundColor: Colors.white,
-      elevation: 0
+      elevation: 0,
+      actions: [
+        // 新建对话按钮
+        IconButton(
+          icon: const Icon(Icons.add),
+          tooltip: '新建对话',
+          onPressed: () async {
+            await ref.read(chatProvider.notifier).createNewConversation();
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('已新建对话')),
+              );
+            }
+          },
+        ),
+        // 自动朗读按钮
+        Consumer(
+          builder: (context, ref, child) {
+            final autoPlayTTS = ref.watch(chatProvider).autoPlayTTS;
+            return IconButton(
+              icon: Icon(
+                autoPlayTTS ? Icons.volume_up : Icons.volume_off,
+                color: Colors.white,
+              ),
+              tooltip: autoPlayTTS ? '自动朗读已开启' : '自动朗读已关闭',
+              onPressed: () async {
+                await ref.read(chatProvider.notifier).toggleTTSAutoPlay();
+                final newValue = ref.read(chatProvider).autoPlayTTS;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(newValue ? '自动朗读已开启' : '自动朗读已关闭'),
+                    duration: const Duration(seconds: 1),
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -156,7 +194,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return EasyRefresh(
       controller: EasyRefreshController(),
       header: const ClassicHeader(position: IndicatorPosition.locator),
-      footer: const ClassicFooter(position: IndicatorPosition.locator),
+      footer: const CupertinoFooter(position: IndicatorPosition.locator),
       onLoad: (state.hasMoreMessages && !state.isLoadingMore)
           ? () async {
               await ref.read(chatProvider.notifier).loadMoreMessages();
@@ -209,12 +247,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.psychology,
-                size: 80,
-                color: Colors.grey.shade400,
-              ),
-              const SizedBox(height: 16),
+         
               if (hasIntroduction) ...[
                 // 显示会话开场白
                 Container(
@@ -257,7 +290,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '输入任何你想练习的英语内容\nAI助手会帮你纠错、翻译和提供学习建议',
+                  '输入任何你想练习的内容\nAI助手会帮你纠错、翻译和提供学习建议,可以是中文、英文,也可以中英混杂',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
@@ -279,7 +312,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final prompts = [
       '那年18,母校舞会,站着如喽啰',
       'I  have been 练习 for two years and a half',
-      'I like sing,jump,and playing basketball',
+      'I like sing,jump,and play basketball',
     ];
 
     return Column(
@@ -326,7 +359,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       onStop: () => ref.read(chatProvider.notifier).stopGeneration(),
       hintText: state.currentConversation == null 
         ? '创建会话中...' 
-        : '输入你想练习的英语内容...',
+        : '输入你想练习的内容...',
       autofocus: false,
     );
   }

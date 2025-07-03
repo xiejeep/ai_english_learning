@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 enum MessageType {
   user,
   ai,
@@ -24,6 +26,8 @@ class MessageModel {
   final String? translation; // 翻译
   final String? suggestion; // 学习建议
   final String? audioUrl; // 语音文件URL
+  // 新增：富文本内容（仅本地使用，不参与json序列化）
+  final List<InlineSpan>? richContent;
   
   const MessageModel({
     required this.id,
@@ -36,6 +40,7 @@ class MessageModel {
     this.translation,
     this.suggestion,
     this.audioUrl,
+    this.richContent,
   });
   
   // 从JSON创建对象
@@ -57,6 +62,7 @@ class MessageModel {
       translation: json['translation'] as String?,
       suggestion: json['suggestion'] as String?,
       audioUrl: json['audio_url'] as String?,
+      richContent: null, // 富文本内容仅本地生成，不从json恢复
     );
   }
   
@@ -88,6 +94,7 @@ class MessageModel {
     String? translation,
     String? suggestion,
     String? audioUrl,
+    List<InlineSpan>? richContent,
   }) {
     return MessageModel(
       id: id ?? this.id,
@@ -100,6 +107,7 @@ class MessageModel {
       translation: translation ?? this.translation,
       suggestion: suggestion ?? this.suggestion,
       audioUrl: audioUrl ?? this.audioUrl,
+      richContent: richContent ?? this.richContent,
     );
   }
   

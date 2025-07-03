@@ -66,6 +66,9 @@ dependencies:
   # 下拉刷新
   easy_refresh: ^3.4.0
 
+  # 离线TTS
+  flutter_tts: ^4.2.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

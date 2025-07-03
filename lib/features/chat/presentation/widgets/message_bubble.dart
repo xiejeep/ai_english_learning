@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../shared/models/message_model.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/constants/app_constants.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
 class MessageBubble extends StatelessWidget {
   final MessageModel message;
@@ -9,6 +13,86 @@ class MessageBubble extends StatelessWidget {
   final bool isTTSLoading;
   final bool isCurrentlyPlaying;
   final bool isTemporary;
+
+  // 离线TTS实例（静态，避免重复初始化）
+  static final FlutterTts _flutterTts = FlutterTts();
+  static bool _ttsInitialized = false;
+
+  // 离线TTS朗读
+  static Future<void> speak(String text) async {
+    if (!_ttsInitialized) {
+      await _flutterTts.awaitSpeakCompletion(true);
+      _ttsInitialized = true;
+    }
+    await _flutterTts.stop(); // 保证状态干净
+    await _flutterTts.setLanguage('en-US');
+    await _flutterTts.setSpeechRate(0.45);
+    await _flutterTts.setVolume(1.0);
+    await _flutterTts.setPitch(1.0);
+    var isAvailable = await _flutterTts.isLanguageAvailable('en-US');
+    if (isAvailable == true) {
+      await _flutterTts.speak(text);
+    }
+  }
+
+  // 弹出菜单并处理操作（改为BottomSheet方式）
+  static void showWordMenu(BuildContext context, String word) async {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (BuildContext ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.volume_up),
+                title: const Text('朗读'),
+                onTap: () async {
+                  Navigator.of(ctx).pop();
+                  await speak(word);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.copy),
+                title: const Text('复制'),
+                onTap: () async {
+                  Navigator.of(ctx).pop();
+                  await Clipboard.setData(ClipboardData(text: word));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('已复制: $word'), duration: Duration(seconds: 1)),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 富文本处理：将英文单词/短语整体分为可点击span
+  static List<InlineSpan> parseRichContent(String content, BuildContext context, void Function(BuildContext, String) onTap) {
+    final List<InlineSpan> spans = [];
+    final RegExp reg = RegExp(r"([a-zA-Z][a-zA-Z'-]* ?)+|[^a-zA-Z]+", multiLine: true);
+    final matches = reg.allMatches(content);
+    for (final m in matches) {
+      final text = m.group(0)!;
+      if (RegExp(r'^[a-zA-Z]').hasMatch(text.trim())) {
+        spans.add(TextSpan(
+          text: text,
+          style: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
+          recognizer: TapGestureRecognizer()
+            ..onTap = () => onTap(context, text.trim()),
+        ));
+      } else {
+        spans.add(TextSpan(text: text));
+      }
+    }
+    return spans;
+  }
 
   const MessageBubble({
     Key? key,
@@ -105,7 +189,14 @@ class MessageBubble extends StatelessWidget {
     return Column(
       crossAxisAlignment: align,
       children: [
-        avatar,
+        isMe
+            ? GestureDetector(
+                onTap: () {
+                  context.push(AppConstants.profileRoute);
+                },
+                child: avatar,
+              )
+            : avatar,
         const SizedBox(height: 4),
         Row(
           mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
@@ -133,10 +224,48 @@ class MessageBubble extends StatelessWidget {
                         if (isTemporary)
                           _buildTemporaryMessageContent(message.content, textColor)
                         else
-                          Text(
-                            message.content,
-                            style: TextStyle(color: textColor, fontSize: 16),
-                          ),
+                          // 用户消息用普通文本，AI消息用富文本
+                          isMe
+                              ? Text(
+                                  message.content,
+                                  style: TextStyle(color: textColor, fontSize: 16),
+                                )
+                              : (
+                                  message.richContent != null
+                                      ? Builder(
+                                          builder: (context) => RichText(
+                                            text: TextSpan(
+                                              children: message.richContent!.map((span) {
+                                                if (span is TextSpan && span.recognizer != null) {
+                                                  // 重新包装recognizer，点击弹出菜单
+                                                  return TextSpan(
+                                                    text: span.text,
+                                                    style: span.style,
+                                                    recognizer: TapGestureRecognizer()
+                                                      ..onTap = () {
+                                                        showWordMenu(context, span.text ?? '');
+                                                      },
+                                                  );
+                                                }
+                                                return span;
+                                              }).toList(),
+                                              style: TextStyle(color: textColor, fontSize: 16),
+                                            ),
+                                          ),
+                                        )
+                                      : Builder(
+                                          builder: (context) => RichText(
+                                            text: TextSpan(
+                                              children: MessageBubble.parseRichContent(
+                                                message.content,
+                                                context,
+                                                showWordMenu,
+                                              ),
+                                              style: TextStyle(color: textColor, fontSize: 16),
+                                            ),
+                                          ),
+                                        )
+                                ),
                       ],
                     ),
                   ),

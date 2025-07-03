@@ -104,7 +104,7 @@ class _MessageInputState extends State<MessageInput> {
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _handleSend(),
                   decoration: InputDecoration(
-                    hintText: widget.hintText ?? '输入你想练习的英语内容...',
+                    hintText: widget.hintText ?? '输入你想练习的内容...',
                     hintStyle: TextStyle(
                       color: theme.colorScheme.onSurface.withOpacity(0.6),
                     ),

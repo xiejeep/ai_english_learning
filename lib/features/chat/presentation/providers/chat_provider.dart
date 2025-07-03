@@ -10,6 +10,8 @@ import '../../domain/entities/conversation.dart';
 import 'chat_state.dart';
 import '../../../../core/storage/storage_service.dart';
 import '../../../../core/services/tts_cache_service.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 
 // 聊天相关的Provider
 final chatRemoteDataSourceProvider = Provider<ChatRemoteDataSource>((ref) {
@@ -89,7 +91,30 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWith(autoPlayTTS: autoPlay);
   }
 
-
+  // 富文本处理：将英文单词/短语整体分为可点击span
+  static List<InlineSpan> parseRichContent(String content, void Function(BuildContext, String) onTap, [BuildContext? context]) {
+    final List<InlineSpan> spans = [];
+    final RegExp reg = RegExp(r"([a-zA-Z][a-zA-Z'-]* ?)+|[^a-zA-Z]+", multiLine: true);
+    final matches = reg.allMatches(content);
+    for (final m in matches) {
+      final text = m.group(0)!;
+      if (RegExp(r'^[a-zA-Z]').hasMatch(text.trim())) {
+        spans.add(TextSpan(
+          text: text,
+          style: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
+          recognizer: TapGestureRecognizer()
+            ..onTap = () {
+              if (context != null) {
+                onTap(context, text.trim());
+              }
+            },
+        ));
+      } else {
+        spans.add(TextSpan(text: text));
+      }
+    }
+    return spans;
+  }
 
   // 创建新会话（不预先生成ID，等待Dify返回）
   Future<void> createNewConversation() async {
@@ -114,8 +139,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
       state = state.setError('创建会话失败: $e');
     }
   }
-
-
 
   // 切换到指定会话
   Future<void> switchToConversation(Conversation conversation) async {
@@ -147,9 +170,16 @@ class ChatNotifier extends StateNotifier<ChatState> {
           ? _extractOriginalMessageId(messages.first.id) 
           : null;
       
+      // 富文本处理
+      final processedMessages = messages.map((msg) =>
+        msg.isAI ? msg.copyWith(richContent: parseRichContent(msg.content, (context, word) {
+          print('点击了单词: ' + word);
+        }, null)) : msg
+      ).toList();
+      
       state = state.copyWith(
         currentConversation: conversation,
-        messages: messages,
+        messages: processedMessages,
         status: ChatStatus.success,
         firstId: firstId,
         hasMoreMessages: hasMore,
@@ -189,9 +219,16 @@ class ChatNotifier extends StateNotifier<ChatState> {
             ? _extractOriginalMessageId(messages.first.id) 
             : null;
         
+        // 富文本处理
+        final processedMessages = messages.map((msg) =>
+          msg.isAI ? msg.copyWith(richContent: parseRichContent(msg.content, (context, word) {
+            print('点击了单词: ' + word);
+          }, null)) : msg
+        ).toList();
+        
         state = state.copyWith(
           currentConversation: latestConversation,
-          messages: messages,
+          messages: processedMessages,
           status: ChatStatus.success,
           firstId: firstId,
           hasMoreMessages: hasMore,
@@ -245,8 +282,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
       print('📊 API返回hasMore: $hasMore');
       
       if (newMessages.isNotEmpty) {
-        // 将新的历史消息插入到现有消息列表的开头
-        final updatedMessages = [...newMessages, ...state.messages];
+        // 富文本处理
+        final processedNewMessages = newMessages.map((msg) =>
+          msg.isAI ? msg.copyWith(richContent: parseRichContent(msg.content, (context, word) {
+            print('点击了单词: ' + word);
+          }, null)) : msg
+        ).toList();
+        final updatedMessages = [...processedNewMessages, ...state.messages];
         
         // 更新游标为最早的消息ID
         final newFirstId = newMessages.isNotEmpty 
@@ -301,9 +343,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
 
     try {
-      // 创建用户消息
+      // 创建用户消息和AI消息，确保id唯一
+      final baseId = _generateMessageId();
       final userMessage = MessageModel(
-        id: _generateMessageId(),
+        id: '${baseId}_user',
         content: content,
         type: MessageType.user,
         status: MessageStatus.sent,
@@ -313,7 +356,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
       // 创建临时AI消息用于显示流式响应
       final tempAiMessage = MessageModel(
-        id: _generateMessageId(),
+        id: '${baseId}_ai',
         content: '正在思考中...',
         type: MessageType.ai,
         status: MessageStatus.received,
@@ -410,6 +453,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
               return msg.copyWith(
                 content: fullResponse,
                 status: MessageStatus.received,
+                richContent: parseRichContent(fullResponse, (context, word) {
+                  // TODO: 这里可以弹窗或跳转单词详情
+                  print('点击了单词: ' + word);
+                }, null),
               );
             }
             return msg;

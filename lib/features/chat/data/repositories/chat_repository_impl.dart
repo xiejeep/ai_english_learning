@@ -6,6 +6,7 @@ import '../../domain/repositories/chat_repository.dart';
 import '../datasources/chat_remote_datasource.dart';
 import '../models/conversation_model.dart';
 import '../../../../shared/models/message_model.dart';
+import '../../../../core/storage/storage_service.dart';
 
 class ChatRepositoryImpl implements ChatRepository {
   final ChatRemoteDataSource _remoteDataSource;
@@ -20,7 +21,7 @@ class ChatRepositoryImpl implements ChatRepository {
     return _remoteDataSource.sendMessageStream(
       message: message,
       conversationId: conversationId,
-      userId: 'default_user',
+      userId: _getCurrentUserId(),
     );
   }
 
@@ -32,7 +33,7 @@ class ChatRepositoryImpl implements ChatRepository {
     return _remoteDataSource.sendMessageStreamWithConversationId(
       message: message,
       conversationId: conversationId,
-      userId: 'default_user',
+      userId: _getCurrentUserId(),
     );
   }
 
@@ -44,7 +45,7 @@ class ChatRepositoryImpl implements ChatRepository {
     final response = await _remoteDataSource.sendMessage(
       message: message,
       conversationId: conversationId,
-      userId: 'default_user',
+      userId: _getCurrentUserId(),
     );
     
     // 将API响应转换为MessageModel
@@ -289,5 +290,13 @@ class ChatRepositoryImpl implements ChatRepository {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final random = Random().nextInt(999999);
     return 'conv_${timestamp}_$random';
+  }
+
+  String _getCurrentUserId() {
+    final userMap = StorageService.getUser();
+    if (userMap != null && userMap['id'] != null && userMap['id'].toString().isNotEmpty) {
+      return userMap['id'].toString();
+    }
+    return 'default_user';
   }
 }

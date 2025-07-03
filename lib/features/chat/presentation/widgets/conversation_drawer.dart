@@ -5,6 +5,7 @@ import '../providers/chat_state.dart';
 import '../providers/conversation_list_provider.dart';
 import '../../domain/entities/conversation.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../auth/presentation/providers/credits_provider.dart';
 
 class ConversationDrawer extends ConsumerStatefulWidget {
   const ConversationDrawer({super.key});
@@ -23,6 +24,8 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
       if (conversationListState.conversations.isEmpty) {
         ref.read(conversationListProvider.notifier).loadConversations();
       }
+      // 只在抽屉首次打开时刷新积分
+      ref.invalidate(creditsBalanceProvider);
     });
   }
 
@@ -45,81 +48,66 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
   }
 
   Widget _buildDrawerHeader() {
-    return DrawerHeader(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF4A6FFF),
-            Color(0xFF7B93FF),
-          ],
+    final orientation = MediaQuery.of(context).orientation;
+    final isLandscape = orientation == Orientation.landscape;
+    final headerHeight = isLandscape ? 96.0 : 160.0;
+    final titleFontSize = isLandscape ? 14.0 : 16.0;
+    final countFontSize = isLandscape ? 10.0 : 12.0;
+    final verticalPadding = isLandscape ? 8.0 : 20.0;
+
+    return SizedBox(
+      height: headerHeight,
+      child: DrawerHeader(
+        margin: EdgeInsets.zero,
+        padding: EdgeInsets.zero,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF4A6FFF),
+              Color(0xFF7B93FF),
+            ],
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-        
-          Row(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: verticalPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                '管理你的对话记录',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.9),
-                  fontSize: 16,
-                ),
+              Row(
+                children: [
+                  Text(
+                    '会话记录',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: titleFontSize,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Consumer(
+                builder: (context, ref, child) {
+                  final creditsAsync = ref.watch(creditsBalanceProvider);
+                  return creditsAsync.when(
+                    loading: () => const Text('积分加载中...', style: TextStyle(fontSize: 12, color: Colors.white70)),
+                    error: (e, _) => Text('积分加载失败', style: const TextStyle(fontSize: 12, color: Colors.redAccent)),
+                    data: (credits) => Text('当前积分：$credits', style: const TextStyle(fontSize: 12, color: Colors.white)),
+                  );
+                },
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          Consumer(
-            builder: (context, ref, child) {
-              final conversationListState = ref.watch(conversationListProvider);
-              final conversationCount = conversationListState.conversations.length;
-              
-              return Text(
-                '共 $conversationCount 个对话',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
-                  fontSize: 12,
-                ),
-              );
-            },
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildNewConversationTile() {
-    return ListTile(
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: const Color(0xFF4A6FFF).withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Icon(
-          Icons.add,
-          color: Color(0xFF4A6FFF),
-        ),
-      ),
-      title: const Text(
-        '新建对话',
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF4A6FFF),
-        ),
-      ),
-      subtitle: const Text('开始新的英语学习对话'),
-      onTap: () {
-        Navigator.pop(context); // 关闭抽屉
-        // 直接创建新会话，不显示主题选择弹窗
-        ref.read(chatProvider.notifier).createNewConversation();
-      },
-    );
+    // 彻底移除新建对话按钮
+    return const SizedBox.shrink();
   }
 
   Widget _buildConversationsList() {
@@ -217,6 +205,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
         final latestConversations = sortedConversations.take(10).toList();
 
         return ListView.builder(
+          padding: const EdgeInsets.symmetric(vertical: 10.0,horizontal: 5.0),
           itemCount: latestConversations.length,
           itemBuilder: (context, index) {
             final conversation = latestConversations[index];
@@ -334,25 +323,10 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
   Widget _buildDrawerFooter() {
     return Consumer(
       builder: (context, ref, child) {
-        final chatState = ref.watch(chatProvider);
-        
         return Container(
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              ListTile(
-                leading: Icon(
-                  chatState.autoPlayTTS ? Icons.volume_up : Icons.volume_off,
-                  color: const Color(0xFF4A6FFF),
-                ),
-                title: Text(
-                  chatState.autoPlayTTS ? '自动朗读：开启' : '自动朗读：关闭',
-                  style: const TextStyle(fontSize: 14),
-                ),
-                onTap: () {
-                  ref.read(chatProvider.notifier).toggleTTSAutoPlay();
-                },
-              ),
               const SizedBox(height: 8),
               Text(
                 '趣TALK伙伴 v${AppConstants.appVersion}',
