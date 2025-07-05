@@ -1,10 +1,10 @@
+import 'package:ai_english_learning/features/auth/presentation/pages/profile_page.dart';
+import 'package:ai_english_learning/features/auth/presentation/pages/token_history_page.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter/material.dart';
-import '../../features/chat/presentation/pages/chat_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
-import '../../features/auth/presentation/pages/profile_page.dart';
+import '../../features/chat/presentation/pages/chat_page.dart';
 import '../constants/app_constants.dart';
 
 class AppRouter {
@@ -28,9 +28,13 @@ class AppRouter {
         builder: (context, state) => const ForgotPasswordPage(),
       ),
       GoRoute(
-        path: AppConstants.profileRoute,
-        builder: (context, state) => const ProfilePage(),
+          path: AppConstants.profileRoute,
+          builder: (context, state) => const ProfilePage(),
+        ),
+      GoRoute(
+        path: AppConstants.creditsHistoryRoute,
+        builder: (context, state) => const TokenHistoryPage(),
       ),
     ],
   );
-} 
+}

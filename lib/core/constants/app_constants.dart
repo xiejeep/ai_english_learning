@@ -6,8 +6,8 @@ class AppConstants {
   static const String appVersion = '1.0.0';
   
   // API配置
-  static const String baseUrl = 'https://api.classhorse.top/';
-  // static const String baseUrl = 'http://192.168.0.59:3000/';
+  // static const String baseUrl = 'https://api.classhorse.cn/';
+  static const String baseUrl = 'http://192.168.0.55:3000/';
   static const String apiVersion = 'v1';
   
   // API路径
@@ -23,13 +23,8 @@ class AppConstants {
   static const String difyTtsPath = '/api/dify/text-to-audio';
   static const String difyConversationsPath = '/api/dify/conversations';
   
-  // Dify标准API配置（参考dify_flutter项目）
-  static const String difyAppId = '你的实际AppId'; // 需要从服务器获取正确的AppId
-  static const String difyApiPrefix = '/console/api';
-  static const String difyStandardTtsPath = '$difyApiPrefix/installed-apps/$difyAppId/text-to-audio';
-  
   // 主题颜色
-  static const Color primaryColor = Color(0xFF4A6FFF);
+  static const Color primaryColor = Color.fromARGB(255, 47, 33, 28);
   static const Color primaryLightColor = Color(0xFF7B93FF);
   static const Color primaryDarkColor = Color(0xFF2C5BFF);
   
@@ -41,6 +36,8 @@ class AppConstants {
   static const String homeRoute = '/home';
   static const String chatRoute = '/chat';
   static const String profileRoute = '/profile';
+  static const String tokenUsageRoute = '/token-usage';
+  static const String creditsHistoryRoute = '/credits-history';
   static const String creditsRoute = '/credits';
   static const String checkinRoute = '/checkin';
   static const String settingsRoute = '/settings';

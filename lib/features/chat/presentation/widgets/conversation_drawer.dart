@@ -26,8 +26,8 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
       if (conversationListState.conversations.isEmpty) {
         ref.read(conversationListProvider.notifier).loadConversations();
       }
-      // 只在抽屉首次打开时刷新积分
-      ref.invalidate(creditsBalanceProvider);
+      // 只在抽屉首次打开时刷新token余额
+      ref.invalidate(tokenBalanceProvider);
     });
   }
 
@@ -52,7 +52,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
   Widget _buildDrawerHeader() {
     final orientation = MediaQuery.of(context).orientation;
     final isLandscape = orientation == Orientation.landscape;
-    final headerHeight = isLandscape ? 96.0 : 160.0;
+    final headerHeight = isLandscape ? 126.0 : 160.0;
     final titleFontSize = isLandscape ? 14.0 : 16.0;
     final countFontSize = isLandscape ? 10.0 : 12.0;
     final verticalPadding = isLandscape ? 8.0 : 20.0;
@@ -62,15 +62,8 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
       child: DrawerHeader(
         margin: EdgeInsets.zero,
         padding: EdgeInsets.zero,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF4A6FFF),
-              Color(0xFF7B93FF),
-            ],
-          ),
+        decoration: BoxDecoration(
+          color: Theme.of(context).primaryColor,
         ),
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: verticalPadding),
@@ -78,25 +71,69 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // 第一行：标题和按钮
               Row(
                 children: [
-                  Text(
-                    '会话记录',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: titleFontSize,
+                  Expanded(
+                    child: Text(
+                      '会话记录',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: titleFontSize,
+                      ),
                     ),
+                  ),
+                  // 新建会话按钮
+                  IconButton(
+                    icon: const Icon(Icons.add, color: Colors.white, size: 20),
+                    tooltip: '新建会话',
+                    onPressed: () async {
+                      await ref.read(chatProvider.notifier).createNewConversation();
+                      if (context.mounted) {
+                        Navigator.pop(context); // 关闭抽屉
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('已新建对话')),
+                        );
+                      }
+                    },
+                  ),
+                  // 自动朗读按钮
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final autoPlayTTS = ref.watch(chatProvider).autoPlayTTS;
+                      return IconButton(
+                        icon: Icon(
+                          autoPlayTTS ? Icons.volume_up : Icons.volume_off,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        tooltip: autoPlayTTS ? '自动朗读已开启' : '自动朗读已关闭',
+                        onPressed: () async {
+                          await ref.read(chatProvider.notifier).toggleTTSAutoPlay();
+                          final newValue = ref.read(chatProvider).autoPlayTTS;
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(newValue ? '自动朗读已开启' : '自动朗读已关闭'),
+                                duration: const Duration(seconds: 1),
+                              ),
+                            );
+                          }
+                        },
+                      );
+                    },
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
+
+              // 第二行：Token余额
               Consumer(
                 builder: (context, ref, child) {
-                  final creditsAsync = ref.watch(creditsBalanceProvider);
-                  return creditsAsync.when(
-                    loading: () => const Text('积分加载中...', style: TextStyle(fontSize: 12, color: Colors.white70)),
-                    error: (e, _) => Text('积分加载失败', style: const TextStyle(fontSize: 12, color: Colors.redAccent)),
-                    data: (credits) => Text('当前积分：$credits', style: const TextStyle(fontSize: 12, color: Colors.white)),
+                  final tokenAsync = ref.watch(tokenBalanceProvider);
+                  return tokenAsync.when(
+                    loading: () => const Text('Token余额加载中...', style: TextStyle(fontSize: 12, color: Colors.white70)),
+                    error: (e, _) => Text('Token余额加载失败', style: const TextStyle(fontSize: 12, color: Colors.redAccent)),
+                    data: (token) => Text('当前Token余额：$token', style: const TextStyle(fontSize: 12, color: Colors.white)),
                   );
                 },
               ),
@@ -155,7 +192,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                     icon: const Icon(Icons.refresh),
                     label: const Text('重试'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppConstants.primaryColor,
+                      backgroundColor: Theme.of(context).primaryColor,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 20,
@@ -224,7 +261,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFF4A6FFF).withOpacity(0.1) : null,
+        color: isSelected ? Theme.of(context).primaryColor.withOpacity(0.1) : null,
         borderRadius: BorderRadius.circular(8),
       ),
       child: ListTile(
@@ -233,7 +270,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
           height: 40,
           decoration: BoxDecoration(
             color: isSelected 
-                ? const Color(0xFF4A6FFF) 
+                ? Theme.of(context).primaryColor 
                 : Colors.grey.shade200,
             borderRadius: BorderRadius.circular(8),
           ),
@@ -247,7 +284,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
           conversation.displayName,
           style: TextStyle(
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            color: isSelected ? const Color(0xFF4A6FFF) : null,
+            color: isSelected ? Theme.of(context).primaryColor : null,
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -324,7 +361,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
             // 切换会话前先unfocus并关闭抽屉
             FocusScope.of(context).unfocus();
             Navigator.pop(context);
-            await ref.read(chatProvider.notifier).switchToConversation(conversation);
+          await ref.read(chatProvider.notifier).switchToConversation(conversation);
           }
         },
       ),
@@ -344,7 +381,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                       icon: const Icon(Icons.logout, size: 18),
                       label: const Text('退出登录'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.redAccent,
+                        backgroundColor: Theme.of(context).primaryColor,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
@@ -379,10 +416,10 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                           }
                         }
                       },
-                    ),
-                  ),
                 ),
               ),
+                ),
+          ),
         );
       },
     );

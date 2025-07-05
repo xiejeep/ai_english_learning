@@ -216,7 +216,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             onPressed: canSendCode ? _handleSendCode : null,
             style: OutlinedButton.styleFrom(
               side: BorderSide(
-                color: canSendCode ? AppConstants.primaryColor : Colors.grey.shade400,
+                color: canSendCode ? Theme.of(context).primaryColor : Colors.grey.shade400,
               ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -225,7 +225,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             child: Text(
               buttonText,
               style: TextStyle(
-                color: canSendCode ? AppConstants.primaryColor : Colors.grey.shade600,
+                color: canSendCode ? Theme.of(context).primaryColor : Colors.grey.shade600,
               ),
             ),
           ),

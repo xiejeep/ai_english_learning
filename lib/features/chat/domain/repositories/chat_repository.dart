@@ -14,12 +14,6 @@ abstract class ChatRepository {
     required String conversationId,
   });
   
-  // 发送消息并获取完整AI回复
-  Future<MessageModel> sendMessage({
-    required String message,
-    required String conversationId,
-  });
-  
   // 停止AI回复
   Future<void> stopGeneration();
   
@@ -59,4 +53,7 @@ abstract class ChatRepository {
   
   // 获取TTS音频文件路径
   Future<String> getTTSAudio(String text);
+  
+  // 获取token使用历史
+  // Future<List<TokenUsageModel>> getTokenUsageHistory(); // 已废弃，删除
 }

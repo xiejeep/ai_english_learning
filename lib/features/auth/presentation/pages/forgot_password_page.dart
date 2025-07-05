@@ -126,7 +126,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppConstants.primaryColor),
+                      borderSide: BorderSide(color: Theme.of(context).primaryColor),
                     ),
                   ),
                   onChanged: forgotPasswordNotifier.updateEmail,
@@ -154,7 +154,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                           }
                         : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppConstants.primaryColor,
+                      backgroundColor: Theme.of(context).primaryColor,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -199,10 +199,10 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                     ),
                     TextButton(
                       onPressed: () => context.pop(),
-                      child: const Text(
+                      child:  Text(
                         '返回登录',
                         style: TextStyle(
-                          color: AppConstants.primaryColor,
+                          color: Theme.of(context).primaryColor,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -241,7 +241,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppConstants.primaryColor),
+            borderSide: BorderSide(color: Theme.of(context).primaryColor),
           ),
         ),
         onChanged: notifier.updateVerificationCode,
@@ -285,7 +285,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppConstants.primaryColor),
+            borderSide: BorderSide(color: Theme.of(context).primaryColor),
           ),
         ),
         onChanged: notifier.updateNewPassword,
@@ -329,7 +329,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppConstants.primaryColor),
+            borderSide: BorderSide(color: Theme.of(context).primaryColor),
           ),
         ),
         onChanged: notifier.updateConfirmPassword,
@@ -366,7 +366,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                 }
               : null,
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppConstants.primaryColor,
+            backgroundColor: Theme.of(context).primaryColor,
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),

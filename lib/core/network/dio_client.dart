@@ -39,24 +39,58 @@ class DioClient {
           options.headers['Authorization'] = 'Bearer $token';
         }
         
-        print('🚀 请求: ${options.method} ${options.uri}');
-        print('📤 请求头: ${options.headers}');
+        // 记录请求开始时间
+        options.extra['request_start_time'] = DateTime.now().millisecondsSinceEpoch;
+        
+        // 打印详细的请求信息
+        print('�� [${DateTime.now().toString().substring(11, 19)}] 发起请求');
+        print('📍 URL: ${options.method} ${options.uri}');
+        print('📤 Headers: ${options.headers}');
         if (options.data != null) {
-          print('📦 请求体: ${options.data}');
+          print('📦 Body: ${options.data}');
+        }
+        if (options.queryParameters != null && options.queryParameters!.isNotEmpty) {
+          print('🔍 Query: ${options.queryParameters}');
         }
         
         handler.next(options);
       },
       onResponse: (response, handler) {
-        print('✅ 响应: ${response.statusCode} ${response.requestOptions.uri}');
-        print('📥 响应数据: ${response.data}');
+        // 计算请求耗时
+        final startTime = response.requestOptions.extra['request_start_time'] as int?;
+        final duration = startTime != null 
+            ? DateTime.now().millisecondsSinceEpoch - startTime 
+            : 0;
+        
+        // 打印详细的响应信息
+        print('✅ [${DateTime.now().toString().substring(11, 19)}] 请求完成 (${duration}ms)');
+        print('📍 URL: ${response.requestOptions.method} ${response.requestOptions.uri}');
+        print('📊 Status: ${response.statusCode}');
+        print('📥 Response: ${response.data}');
+        
+        // 如果是大响应体，只打印前500字符
+        final responseStr = response.data.toString();
+        if (responseStr.length > 500) {
+          print('📥 Response (truncated): ${responseStr.substring(0, 500)}...');
+        }
+        
         handler.next(response);
       },
       onError: (error, handler) {
-        print('❌ 错误: ${error.message}');
-        print('📍 请求: ${error.requestOptions.uri}');
+        // 计算请求耗时
+        final startTime = error.requestOptions.extra['request_start_time'] as int?;
+        final duration = startTime != null 
+            ? DateTime.now().millisecondsSinceEpoch - startTime 
+            : 0;
+        
+        // 打印详细的错误信息
+        print('❌ [${DateTime.now().toString().substring(11, 19)}] 请求失败 (${duration}ms)');
+        print('📍 URL: ${error.requestOptions.method} ${error.requestOptions.uri}');
+        print('🚨 Error: ${error.message}');
+        print('🔍 Type: ${error.type}');
         if (error.response != null) {
-          print('📦 错误响应体: ${error.response?.data}');
+          print('📊 Status: ${error.response?.statusCode}');
+          print('📦 Error Response: ${error.response?.data}');
         }
         
         // 处理token过期

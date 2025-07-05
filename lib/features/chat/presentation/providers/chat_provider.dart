@@ -479,11 +479,26 @@ class ChatNotifier extends StateNotifier<ChatState> {
           }
         },
         onError: (error) {
-          // 处理错误：移除临时AI消息
+          // 处理错误：移除临时AI消息，并将用户消息标记为失败
           print('❌ 消息发送失败: $error');
           
           final errorUpdatedMessages = state.messages
               .where((msg) => msg.id != tempAiMessage.id)
+              .map((msg) {
+                // 将用户消息标记为失败，并添加错误信息
+                if (msg.id == userMessage.id) {
+                  // 清理错误消息，移除Exception前缀
+                  String cleanErrorMessage = error.toString();
+                  if (cleanErrorMessage.startsWith('Exception: ')) {
+                    cleanErrorMessage = cleanErrorMessage.substring(11);
+                  }
+                  return msg.copyWith(
+                    status: MessageStatus.failed,
+                    errorMessage: cleanErrorMessage,
+                  );
+                }
+                return msg;
+              })
               .toList();
           
           state = state.copyWith(
@@ -508,6 +523,36 @@ class ChatNotifier extends StateNotifier<ChatState> {
       state = state.stopStreaming();
     } catch (e) {
       state = state.setError('停止生成失败: $e');
+    }
+  }
+
+  // 重试发送消息
+  Future<void> retryMessage(String messageId) async {
+    try {
+      // 找到失败的消息
+      final failedMessage = state.messages.firstWhere(
+        (msg) => msg.id == messageId,
+        orElse: () => throw Exception('未找到要重试的消息'),
+      );
+      
+      // 只能重试用户消息
+      if (failedMessage.type != MessageType.user) {
+        throw Exception('只能重试用户消息');
+      }
+      
+      // 移除失败的消息
+      final updatedMessages = state.messages
+          .where((msg) => msg.id != messageId)
+          .toList();
+      
+      state = state.copyWith(messages: updatedMessages);
+      
+      // 重新发送消息
+      await sendMessageStream(failedMessage.content);
+      
+    } catch (e) {
+      print('❌ 重试消息失败: $e');
+      state = state.setError('重试消息失败: $e');
     }
   }
 

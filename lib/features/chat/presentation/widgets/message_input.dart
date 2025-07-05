@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/constants/app_constants.dart';
 
 class MessageInput extends StatefulWidget {
   final TextEditingController controller;
@@ -155,7 +156,7 @@ class _MessageInputState extends State<MessageInput> {
       // 可以发送，显示激活的发送按钮
       icon = Icons.send;
       onPressed = _handleSend;
-      backgroundColor = const Color(0xFF4A6FFF);
+      backgroundColor = Theme.of(context).primaryColor;
       iconColor = Colors.white;
     }
 

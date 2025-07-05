@@ -12,6 +12,7 @@ import 'package:easy_refresh/easy_refresh.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/providers/auth_state.dart';
+import '../../../../shared/models/message_model.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key});
@@ -59,7 +60,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   currentConversation.displayName,
                   style: TextStyle(
                     fontSize: 16,
-                    color: Colors.white.withValues(alpha: 0.8),
+                    color: Colors.white.withOpacity(0.8),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -68,44 +69,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           );
         },
       ),
-      backgroundColor: const Color(0xFF4A6FFF),
+      backgroundColor: Theme.of(context).primaryColor,
       foregroundColor: Colors.white,
       elevation: 0,
       actions: [
-        // 新建对话按钮
+        // 个人中心按钮
         IconButton(
-          icon: const Icon(Icons.add),
-          tooltip: '新建对话',
-          onPressed: () async {
-            await ref.read(chatProvider.notifier).createNewConversation();
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('已新建对话')),
-              );
-            }
-          },
-        ),
-        // 自动朗读按钮
-        Consumer(
-          builder: (context, ref, child) {
-            final autoPlayTTS = ref.watch(chatProvider).autoPlayTTS;
-            return IconButton(
-              icon: Icon(
-                autoPlayTTS ? Icons.volume_up : Icons.volume_off,
-                color: Colors.white,
-              ),
-              tooltip: autoPlayTTS ? '自动朗读已开启' : '自动朗读已关闭',
-              onPressed: () async {
-                await ref.read(chatProvider.notifier).toggleTTSAutoPlay();
-                final newValue = ref.read(chatProvider).autoPlayTTS;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(newValue ? '自动朗读已开启' : '自动朗读已关闭'),
-                    duration: const Duration(seconds: 1),
-                  ),
-                );
-              },
-            );
+          icon: const Icon(Icons.person_outline),
+          tooltip: '个人中心',
+          onPressed: () {
+            context.push(AppConstants.profileRoute);
           },
         ),
       ],
@@ -227,6 +200,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     }
                   : null,
               onCopy: () => _copyMessageToClipboard(msg.content),
+              onRetry: msg.status == MessageStatus.failed ? () => ref.read(chatProvider.notifier).retryMessage(msg.id) : null,
               isTTSLoading: state.isTTSLoading,
               isCurrentlyPlaying: state.isTTSPlaying,
             ),
@@ -254,10 +228,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   margin: const EdgeInsets.symmetric(horizontal: 24),
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4A6FFF).withValues(alpha: 0.05),
+                    color: Theme.of(context).primaryColor.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: const Color(0xFF4A6FFF).withValues(alpha: 0.2),
+                      color: Theme.of(context).primaryColor.withOpacity(0.2),
                       width: 1,
                     ),
                   ),
@@ -336,9 +310,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 _messageController.text = prompt;
                 _sendMessage();
               },
-              backgroundColor: const Color(0xFF4A6FFF).withValues(alpha: 0.1),
-              labelStyle: const TextStyle(
-                color: Color(0xFF4A6FFF),
+              backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+              labelStyle:  TextStyle(
+                color: Theme.of(context).primaryColor,
                 fontWeight: FontWeight.w500,
               ),
             );
@@ -416,7 +390,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               icon: const Icon(Icons.refresh),
               label: const Text('重试'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppConstants.primaryColor,
+                backgroundColor: Theme.of(context).primaryColor,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,

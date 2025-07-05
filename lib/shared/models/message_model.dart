@@ -28,6 +28,8 @@ class MessageModel {
   final String? audioUrl; // 语音文件URL
   // 新增：富文本内容（仅本地使用，不参与json序列化）
   final List<InlineSpan>? richContent;
+  // 新增：错误信息（用于显示发送失败的详细原因）
+  final String? errorMessage;
   
   const MessageModel({
     required this.id,
@@ -41,6 +43,7 @@ class MessageModel {
     this.suggestion,
     this.audioUrl,
     this.richContent,
+    this.errorMessage,
   });
   
   // 从JSON创建对象
@@ -63,6 +66,7 @@ class MessageModel {
       suggestion: json['suggestion'] as String?,
       audioUrl: json['audio_url'] as String?,
       richContent: null, // 富文本内容仅本地生成，不从json恢复
+      errorMessage: json['error_message'] as String?,
     );
   }
   
@@ -79,6 +83,7 @@ class MessageModel {
       'translation': translation,
       'suggestion': suggestion,
       'audio_url': audioUrl,
+      'error_message': errorMessage,
     };
   }
   
@@ -95,6 +100,7 @@ class MessageModel {
     String? suggestion,
     String? audioUrl,
     List<InlineSpan>? richContent,
+    String? errorMessage,
   }) {
     return MessageModel(
       id: id ?? this.id,
@@ -108,6 +114,7 @@ class MessageModel {
       suggestion: suggestion ?? this.suggestion,
       audioUrl: audioUrl ?? this.audioUrl,
       richContent: richContent ?? this.richContent,
+      errorMessage: errorMessage ?? this.errorMessage,
     );
   }
   
@@ -129,6 +136,9 @@ class MessageModel {
   // 判断是否有音频
   bool get hasAudio => audioUrl != null && audioUrl!.isNotEmpty;
   
+  // 判断是否有错误信息
+  bool get hasError => errorMessage != null && errorMessage!.isNotEmpty;
+  
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -143,7 +153,8 @@ class MessageModel {
         other.correction == correction &&
         other.translation == translation &&
         other.suggestion == suggestion &&
-        other.audioUrl == audioUrl;
+        other.audioUrl == audioUrl &&
+        other.errorMessage == errorMessage;
   }
   
   @override
@@ -157,11 +168,12 @@ class MessageModel {
         correction.hashCode ^
         translation.hashCode ^
         suggestion.hashCode ^
-        audioUrl.hashCode;
+        audioUrl.hashCode ^
+        errorMessage.hashCode;
   }
   
   @override
   String toString() {
-    return 'MessageModel(id: $id, content: $content, type: $type, status: $status, timestamp: $timestamp, conversationId: $conversationId, correction: $correction, translation: $translation, suggestion: $suggestion, audioUrl: $audioUrl)';
+    return 'MessageModel(id: $id, content: $content, type: $type, status: $status, timestamp: $timestamp, conversationId: $conversationId, correction: $correction, translation: $translation, suggestion: $suggestion, audioUrl: $audioUrl, errorMessage: $errorMessage)';
   }
-} 
+}

@@ -30,7 +30,7 @@ class AuthButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool buttonEnabled = isEnabled && !isLoading && onPressed != null;
-    final Color bgColor = backgroundColor ?? AppConstants.primaryColor;
+    final Color bgColor = backgroundColor ?? Theme.of(context).primaryColor;
     final Color txtColor = textColor ?? Colors.white;
 
     return SizedBox(
@@ -143,7 +143,7 @@ class AuthSecondaryButton extends StatelessWidget {
       width: width,
       height: height,
       backgroundColor: Colors.transparent,
-      textColor: AppConstants.primaryColor,
+      textColor: Theme.of(context).primaryColor,
       icon: icon,
     );
   }
@@ -180,7 +180,7 @@ class AuthTextButton extends StatelessWidget {
         style: TextStyle(
           fontSize: fontSize,
           fontWeight: fontWeight,
-          color: textColor ?? AppConstants.primaryColor,
+          color: textColor ?? Theme.of(context).primaryColor,
         ),
       ),
     );

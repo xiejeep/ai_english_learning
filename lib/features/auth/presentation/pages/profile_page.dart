@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../providers/auth_provider.dart';
 import 'package:dio/dio.dart';
@@ -119,6 +120,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   Widget build(BuildContext context) {
     final checkinStatusAsync = ref.watch(checkinStatusProvider);
     final creditsAsync = ref.watch(creditsBalanceProvider);
+    final tokenAsync = ref.watch(tokenBalanceProvider);
     // 获取本地用户信息
     final userMap = StorageService.getUser();
     UserModel? user;
@@ -132,119 +134,177 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('个人中心'),
-        backgroundColor: const Color(0xFF4A6FFF),
+        backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // 用户信息展示
-            if (user != null) ...[
-              CircleAvatar(
-                radius: 36,
-                backgroundColor: const Color(0xFF4A6FFF),
-                backgroundImage: user.avatar != null && user.avatar!.isNotEmpty
-                    ? NetworkImage(user.avatar!)
-                    : null,
-                child: (user.avatar == null || user.avatar!.isEmpty)
-                    ? Text(user.username.isNotEmpty ? user.username[0] : '?', style: const TextStyle(fontSize: 32, color: Colors.white))
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              Text(user.username, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text(user.email, style: const TextStyle(fontSize: 14, color: Colors.grey)),
-              if (user.phone != null && user.phone!.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(user.phone!, style: const TextStyle(fontSize: 14, color: Colors.grey)),
-              ],
-              const SizedBox(height: 4),
-              Text('注册时间：${user.createdAt.year}-${user.createdAt.month.toString().padLeft(2, '0')}-${user.createdAt.day.toString().padLeft(2, '0')}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              const Divider(height: 32),
-            ],
-            creditsAsync.when(
-              loading: () => const Text('积分加载中...', style: TextStyle(fontSize: 16, color: Colors.grey)),
-              error: (e, _) => Text('积分加载失败: $e', style: const TextStyle(fontSize: 16, color: Colors.red)),
-              data: (credits) => Text('当前积分：$credits', style: const TextStyle(fontSize: 16, color: Color(0xFF4A6FFF))),
-            ),
-            const SizedBox(height: 32),
-            checkinStatusAsync.when(
-              loading: () => const CircularProgressIndicator(),
-              error: (e, _) => Text('加载签到状态失败: $e'),
-              data: (status) => Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        status.hasCheckedIn ? Icons.verified : Icons.info_outline,
-                        color: status.hasCheckedIn ? Colors.green : Colors.orange,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            tooltip: '退出登录',
+            onPressed: () async {
+              final shouldLogout = await showDialog<bool>(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: const Text('退出登录'),
+                    content: const Text('确定要退出登录吗？'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('取消'),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        status.hasCheckedIn ? '今日已签到' : '今日未签到',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: status.hasCheckedIn ? Colors.green : Colors.orange,
-                        ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: const Text('确定'),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text('连续签到：${status.consecutiveDays} 天', style: const TextStyle(fontSize: 16)),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.check_circle_outline),
-                    label: Text(status.hasCheckedIn ? '已签到' : '立即签到'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: status.hasCheckedIn ? Colors.grey : const Color(0xFF4A6FFF),
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(120, 44),
+                  );
+                },
+              );
+              if (shouldLogout == true) {
+                await ref.read(authProvider.notifier).logout();
+                if (context.mounted) {
+                  Navigator.of(context).pushReplacementNamed(AppConstants.loginRoute);
+                }
+              }
+            },
+          ),
+        ],
+      ),
+      backgroundColor: const Color(0xFFF5F5F5),
+      body: ListView(
+        padding: const EdgeInsets.all(0),
+        children: [
+          // Header: 账户信息+签到（白色圆角卡片）
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12,vertical: 12),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 账户信息（左侧）
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(user?.username ?? '', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text(user?.email ?? '', style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                        if (user?.phone != null && user!.phone!.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(user!.phone!, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                        ],
+                        const SizedBox(height: 4),
+                        if (user != null)
+                          Text('注册时间：${user.createdAt.year}-${user.createdAt.month.toString().padLeft(2, '0')}-${user.createdAt.day.toString().padLeft(2, '0')}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
                     ),
-                    onPressed: status.hasCheckedIn
-                        ? null
-                        : () => _doCheckin(context, ref),
+                  ),
+                  // 签到（右侧）
+                  checkinStatusAsync.when(
+                    loading: () => Column(
+                      children: const [
+                        SizedBox(height: 8),
+                        CircularProgressIndicator(strokeWidth: 2),
+                      ],
+                    ),
+                    error: (e, _) => Column(
+                      children: [
+                        const Icon(Icons.error, color: Colors.red),
+                        Text('加载失败', style: const TextStyle(fontSize: 12, color: Colors.red)),
+                      ],
+                    ),
+                    data: (status) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              status.hasCheckedIn ? Icons.verified : Icons.info_outline,
+                              color: status.hasCheckedIn ? Colors.green : Colors.orange,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(status.hasCheckedIn ? '已签到' : '签到', style: TextStyle(fontSize: 14, color: status.hasCheckedIn ? Colors.green : Colors.orange)),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text('连续：${status.consecutiveDays}天', style: const TextStyle(fontSize: 12)),
+                        const SizedBox(height: 8),
+                        ElevatedButton(
+                          onPressed: status.hasCheckedIn ? null : () => _doCheckin(context, ref),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: status.hasCheckedIn ? Colors.grey : Theme.of(context).primaryColor,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(60, 32),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                          ),
+                          child: Text(status.hasCheckedIn ? '已签到' : '签到'),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-            const Spacer(),
-            ElevatedButton(
-              onPressed: () async {
-                // 显示确认退出登录的弹窗
-                final shouldLogout = await showDialog<bool>(
-                  context: context,
-                  builder: (BuildContext context) {
-                    return AlertDialog(
-                      title: const Text('退出登录'),
-                      content: const Text('确定要退出登录吗？'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(false),
-                          child: const Text('取消'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(true),
-                          child: const Text('确定'),
-                        ),
-                      ],
-                    );
-                  },
-                );
-                if (shouldLogout == true) {
-                  await ref.read(authProvider.notifier).logout();
-                  if (context.mounted) {
-                    Navigator.of(context).pushReplacementNamed(AppConstants.loginRoute);
-                  }
-                }
-              },
-              child: const Text('退出登录'),
+          ),
+          // 当前积分 ListTile（白色卡片）
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: creditsAsync.when(
+                loading: () => const ListTile(
+                  title:  Text('积分'),
+                  trailing: SizedBox(width: 20, height: 20, child: CircularProgressIndicator()),
+                ),
+                error: (e, _) => const ListTile(
+                  title:  Text('积分'),
+                  trailing:  Text('--'),
+                ),
+                
+                data: (credits) => ListTile(
+                  title: const Text('积分'),
+                  trailing: Text('$credits', style: TextStyle(fontSize: 16, color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold)),
+                  
+                ),
+                
+              ),
             ),
-            const SizedBox(height: 24),
-          ],
-        ),
+          ),
+          const SizedBox(height: 12),
+          // Token使用历史 ListTile（白色卡片）
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ListTile(
+                title: const Text('Token'),
+                trailing: tokenAsync.when(
+                  loading: () => const SizedBox(width: 60, child: LinearProgressIndicator()),
+                  error: (e, _) => const Text('--'),
+                  data: (token) => Text('$token', style: TextStyle(fontSize: 16, color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold)),
+                ),
+                onTap: () {
+                  context.push(AppConstants.creditsHistoryRoute);
+                },
+              ),
+            ),
+          ),
+       
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }

@@ -10,6 +10,7 @@ class MessageBubble extends StatelessWidget {
   final MessageModel message;
   final VoidCallback? onPlayTTS;
   final VoidCallback? onCopy;
+  final VoidCallback? onRetry; // 新增重试回调
   final bool isTTSLoading;
   final bool isCurrentlyPlaying;
   final bool isTemporary;
@@ -99,6 +100,7 @@ class MessageBubble extends StatelessWidget {
     required this.message,
     this.onPlayTTS,
     this.onCopy,
+    this.onRetry, // 新增重试回调参数
     this.isTTSLoading = false,
     this.isCurrentlyPlaying = false,
     this.isTemporary = false,
@@ -165,12 +167,13 @@ class MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isMe = message.type == MessageType.user;
-    final bubbleColor = isMe ? const Color(0xFF4A6FFF) : Colors.grey.shade200;
+    final hasError = message.status == MessageStatus.failed;
+    final bubbleColor = isMe ? Theme.of(context).primaryColor : Colors.grey.shade200;
     final textColor = isMe ? Colors.white : Colors.black87;
     final align = isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final avatar = CircleAvatar(
       radius: 16,
-      backgroundColor: isMe ? const Color(0xFF4A6FFF) : Colors.grey.shade400,
+      backgroundColor: isMe ? Theme.of(context).primaryColor : Colors.grey.shade400,
       child: isMe
           ? const Icon(Icons.person, color: Colors.white, size: 18)
           : const Icon(Icons.smart_toy, color: Colors.white, size: 18),
@@ -250,6 +253,24 @@ class MessageBubble extends StatelessWidget {
                                           ),
                                         )
                                 ),
+                        // 显示错误信息
+                        if (hasError && message.hasError) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              message.errorMessage!,
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -267,12 +288,12 @@ class MessageBubble extends StatelessWidget {
             ],
           ],
         ),
-        if (onPlayTTS != null || onCopy != null)
+        if (onPlayTTS != null || onCopy != null || (hasError && onRetry != null))
           Row(
             mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
             children: [
               const SizedBox(width: 30),
-              if (onPlayTTS != null)
+              if (onPlayTTS != null && !hasError)
                 IconButton(
                   icon: Icon(
                     _getTTSButtonIcon(),
@@ -286,10 +307,16 @@ class MessageBubble extends StatelessWidget {
                   } : null,
                   tooltip: _getTTSButtonTooltip(),
                 ),
-              if (onCopy != null)
+              if (onCopy != null && !hasError)
                 IconButton(
                   icon: const Icon(Icons.copy, size: 18),
                   onPressed: onCopy,
+                ),
+              if (hasError && onRetry != null)
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 18, color: Colors.orange),
+                  onPressed: onRetry,
+                  tooltip: '重试',
                 ),
             ],
           ),

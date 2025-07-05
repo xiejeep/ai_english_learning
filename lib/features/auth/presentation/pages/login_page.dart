@@ -181,7 +181,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               _rememberAccount = value ?? false;
                             });
                           },
-                          activeColor: AppConstants.primaryColor,
+                          activeColor: Theme.of(context).primaryColor,
                         ),
                         const Text(
                           '记住账号',
@@ -205,7 +205,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       child: Text(
                         '忘记密码？',
                         style: TextStyle(
-                          color: AppConstants.primaryColor,
+                          color: Theme.of(context).primaryColor,
                           fontSize: 14,
                         ),
                       ),
@@ -273,7 +273,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           width: 80,
           height: 80,
           decoration: BoxDecoration(
-            color: AppConstants.primaryColor,
+            color: Theme.of(context).primaryColor,
             borderRadius: BorderRadius.circular(20),
           ),
           child: const Icon(
@@ -332,7 +332,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           child: Text(
             '立即注册',
             style: TextStyle(
-              color: AppConstants.primaryColor,
+              color: Theme.of(context).primaryColor,
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),

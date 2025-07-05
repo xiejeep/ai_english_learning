@@ -143,39 +143,52 @@ class ChatRemoteDataSource {
       if (e.type == DioExceptionType.cancel) {
         print('用户取消了请求');
       } else {
-        print('网络请求错误: ${e.message}');
-        throw Exception('发送消息失败: ${e.message}');
+        print('❌ 错误: ${e.message}');
+        print('📍 请求: ${e.requestOptions.uri}');
+        
+        // 尝试从错误响应中提取message字段
+        String errorMessage = e.message ?? '发送消息失败';
+        
+        if (e.response?.data != null) {
+          try {
+            String responseBody;
+            if (e.response!.data is ResponseBody) {
+               final responseBodyObj = e.response!.data as ResponseBody;
+               final bytes = <int>[];
+               await for (final chunk in responseBodyObj.stream) {
+                 bytes.addAll(chunk);
+               }
+               responseBody = utf8.decode(bytes);
+            } else if (e.response!.data is String) {
+              responseBody = e.response!.data as String;
+            } else if (e.response!.data is Map) {
+              responseBody = jsonEncode(e.response!.data);
+            } else {
+              responseBody = e.response!.data.toString();
+            }
+            
+            print('📦 错误响应体: $responseBody');
+            
+            if (responseBody.isNotEmpty && responseBody != 'null') {
+              final errorData = jsonDecode(responseBody);
+              if (errorData is Map<String, dynamic> && errorData.containsKey('message')) {
+                errorMessage = errorData['message'] as String;
+                print('💬 提取到错误消息: $errorMessage');
+              }
+            }
+          } catch (parseError) {
+            print('⚠️ 无法解析错误响应: $parseError');
+          }
+        }
+        
+        throw Exception(errorMessage);
       }
     } catch (e) {
       print('发送消息时出现未知错误: $e');
-      throw Exception('发送消息失败: $e');
+      throw Exception('发送消息失败');
     }
   }
   
-  // 发送消息并获取完整回复（非流式）
-  Future<Map<String, dynamic>> sendMessage({
-    required String message,
-    required String conversationId,
-    required String userId,
-  }) async {
-    try {
-      final response = await _dio.post(
-        AppConstants.difychatPath,
-        data: {
-          'inputs': {},
-          'query': message,
-          'response_mode': 'blocking',
-          'conversation_id': conversationId, // 总是传递字符串，空时为 ""
-          'user': userId,
-        },
-      );
-      
-      return response.data as Map<String, dynamic>;
-    } on DioException catch (e) {
-      print('发送消息失败: ${e.message}');
-      throw Exception('发送消息失败: ${e.message}');
-    }
-  }
   
   // 停止生成
   void stopGeneration() {
@@ -796,6 +809,49 @@ class ChatRemoteDataSource {
         print('📊 错误状态码: ${e.response?.statusCode}');
       }
       throw Exception('获取会话消息失败: ${e.message}');
+    }
+  }
+
+  // 获取token使用历史
+  Future<List<Map<String, dynamic>>> getTokenUsageHistory() async {
+    try {
+      print('🚀 获取token使用历史请求: GET /api/dify/token-usage-history');
+      
+      final response = await _dio.get(
+        '/api/dify/token-usage-history',
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      
+      print('✅ token使用历史响应: ${response.data}');
+      print('📊 状态码: ${response.statusCode}');
+      
+      if (response.statusCode == 200 && response.data != null) {
+        final responseData = response.data as Map<String, dynamic>;
+        
+        // API返回的数据结构是 {records: [...]}
+        final records = responseData['records'] as List?;
+        
+        if (records != null) {
+          print('📋 获取到 ${records.length} 条token使用记录');
+          return records.cast<Map<String, dynamic>>();
+        }
+      }
+      
+      print('⚠️ token使用历史响应格式异常');
+      return [];
+    } on DioException catch (e) {
+      print('❌ 获取token使用历史失败: ${e.message}');
+      print('📍 请求URL: ${e.requestOptions.uri}');
+      if (e.response != null) {
+        print('📦 错误响应体: ${e.response?.data}');
+        print('📊 错误状态码: ${e.response?.statusCode}');
+      }
+      throw Exception('获取token使用历史失败: ${e.message}');
     }
   }
 }

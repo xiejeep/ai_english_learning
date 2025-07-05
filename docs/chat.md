@@ -40,7 +40,7 @@ lib/
 
 ```dart
 class Constants {
-  static const String baseUrl = 'http://api.classhorse.top';
+  static const String baseUrl = 'https://api.classhorse.cn';
   static const String appId = '53868c40-a867-407b-a549-a8f2c689f802';
   static const String conversationsEndpoint = '$apiPrefix/installed-apps/$appId/conversations';
   static const String messagesEndpoint = '$apiPrefix/installed-apps/$appId/messages';

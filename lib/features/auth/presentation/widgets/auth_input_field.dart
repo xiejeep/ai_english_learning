@@ -101,7 +101,7 @@ class AuthInputField extends StatelessWidget {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: AppConstants.primaryColor,
+                color: Theme.of(context).primaryColor,
                 width: 2,
               ),
             ),

@@ -7,7 +7,7 @@ import '../datasources/chat_remote_datasource.dart';
 import '../models/conversation_model.dart';
 import '../../../../shared/models/message_model.dart';
 import '../../../../core/storage/storage_service.dart';
-
+import 'dart:math';
 class ChatRepositoryImpl implements ChatRepository {
   final ChatRemoteDataSource _remoteDataSource;
 
@@ -37,27 +37,7 @@ class ChatRepositoryImpl implements ChatRepository {
     );
   }
 
-  @override
-  Future<MessageModel> sendMessage({
-    required String message,
-    required String conversationId,
-  }) async {
-    final response = await _remoteDataSource.sendMessage(
-      message: message,
-      conversationId: conversationId,
-      userId: _getCurrentUserId(),
-    );
-    
-    // 将API响应转换为MessageModel
-    return MessageModel(
-      id: response['id'] as String? ?? _generateMessageId(),
-      content: response['answer'] as String? ?? '',
-      type: MessageType.ai,
-      status: MessageStatus.received,
-      timestamp: DateTime.now(),
-      conversationId: conversationId,
-    );
-  }
+
 
   @override
   Future<void> stopGeneration() async {

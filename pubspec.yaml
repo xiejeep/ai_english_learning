@@ -1,5 +1,5 @@
 name: ai_english_learning
-description: "Flutter AI英语学习应用 - 基于Dify API的智能英语学习助手"
+description: "趣TALK伙伴 基于AI的智能英语学习助手"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -68,6 +68,7 @@ dependencies:
 
   # 离线TTS
   flutter_tts: ^4.2.3
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:
