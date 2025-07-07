@@ -8,7 +8,7 @@ import 'core/constants/app_constants.dart';
 import 'core/utils/app_router.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/auth/presentation/providers/auth_state.dart';
-import 'features/auth/presentation/providers/credits_provider.dart';
+import 'features/auth/presentation/providers/user_profile_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,14 +60,10 @@ class MyApp extends ConsumerWidget {
           print('✅ [MyApp] 检测到登录过期，已跳转到登录页面');
         }
       }
-      // 新增：认证成功时预加载积分余额
+      // 新增：认证成功时预加载用户信息
       if (next.isAuthenticated) {
-        print('[MyApp] 认证成功，预加载积分余额...');
-        ref.read(creditsBalanceProvider.future).then((value) {
-          print('[MyApp] 积分余额预加载完成: $value');
-        }).catchError((e) {
-          print('[MyApp] 积分余额预加载失败: $e');
-        });
+        print('[MyApp] 认证成功，预加载用户信息...');
+        ref.read(userProfileProvider.notifier).loadUserProfile();
       }
     });
 

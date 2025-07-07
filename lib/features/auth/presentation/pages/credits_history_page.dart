@@ -6,7 +6,6 @@ import 'package:easy_refresh/easy_refresh.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/storage/storage_service.dart';
 import '../../../../core/network/dio_client.dart';
-import '../providers/credits_provider.dart';
 import '../providers/user_profile_provider.dart';
 
 // 兑换比例数据模型
@@ -85,8 +84,18 @@ class ExchangeNotifier extends StateNotifier<ExchangeState> {
       }
   }
 
-  Future<void> exchangeCreditsForTokens(int credits, BuildContext context) async {
+  Future<void> exchangeCreditsForTokens(int credits, BuildContext context, WidgetRef ref) async {
     state = state.copyWith(isExchanging: true);
+    
+    // 获取当前用户信息用于乐观更新
+    final currentProfile = ref.read(userProfileProvider);
+    int? currentCredits;
+    int? currentTokenBalance;
+    
+    currentProfile.whenData((profile) {
+      currentCredits = profile.credits;
+      currentTokenBalance = profile.tokenBalance;
+    });
     
     try {
       final dio = DioClient.instance;
@@ -101,25 +110,38 @@ class ExchangeNotifier extends StateNotifier<ExchangeState> {
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
 
-      final tokens = response.data['tokens'] ?? 0;
+      final tokens = (response.data['tokensEarned'] ?? 0) as int;
       state = state.copyWith(isExchanging: false);
+      
+      // 乐观更新：直接更新本地状态
+      if (currentCredits != null && currentTokenBalance != null) {
+        final newCredits = currentCredits! - credits;
+        final newTokenBalance = currentTokenBalance! + tokens;
+        
+        print('[Exchange] 兑换成功，更新本地状态: 消耗积分=$credits, 获得tokens=$tokens');
+        print('[Exchange] 更新前: credits=$currentCredits, tokens=$currentTokenBalance');
+        print('[Exchange] 更新后: credits=$newCredits, tokens=$newTokenBalance');
+        
+        ref.read(userProfileProvider.notifier).updateCreditsAndTokens(
+          newCredits,
+          newTokenBalance,
+        );
+      } else {
+        print('[Exchange] 警告：无法获取当前用户状态，跳过乐观更新');
+      }
+      
+      // 刷新积分历史记录
+      ref.read(creditsHistoryProvider.notifier).refresh();
       
       // 显示成功SnackBar
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-         const SnackBar(
+      const SnackBar(
             content: Text('兑换成功'),
             backgroundColor: Colors.green,
-            duration:  Duration(seconds: 3),
+            duration: Duration(seconds: 3),
           ),
         );
-        
-        // 刷新全局用户信息（包括积分和token余额）
-        final container = ProviderScope.containerOf(context);
-        container.invalidate(userProfileProvider);
-        // 同时刷新原有的provider以保持兼容性
-        container.invalidate(creditsBalanceProvider);
-        container.invalidate(tokenBalanceProvider);
       }
     } catch (e) {
       state = state.copyWith(isExchanging: false);
@@ -465,8 +487,17 @@ class _CreditsHistoryPageState extends ConsumerState<CreditsHistoryPage> {
     return Consumer(
       builder: (context, ref, child) {
         final exchangeState = ref.watch(exchangeProvider);
-        final creditsAsync = ref.watch(creditsBalanceProvider);
-        final tokensAsync = ref.watch(tokenBalanceProvider);
+        final userProfile = ref.watch(userProfileProvider);
+        final creditsAsync = userProfile.when(
+          data: (profile) => AsyncValue.data(profile.credits),
+          loading: () => const AsyncValue.loading(),
+          error: (error, stack) => AsyncValue.error(error, stack),
+        );
+        final tokensAsync = userProfile.when(
+           data: (profile) => AsyncValue.data(profile.tokenBalance),
+           loading: () => const AsyncValue.loading(),
+           error: (error, stack) => AsyncValue.error(error, stack),
+         );
         
         return Container(
           margin: const EdgeInsets.all(16),
@@ -653,7 +684,12 @@ class _CreditsHistoryPageState extends ConsumerState<CreditsHistoryPage> {
 
   void _showExchangeDialog(ExchangeRateModel exchangeRate) {
     final TextEditingController creditsController = TextEditingController();
-    final creditsAsync = ref.read(creditsBalanceProvider);
+    final userProfile = ref.read(userProfileProvider);
+    final creditsAsync = userProfile.when(
+      data: (profile) => AsyncValue.data(profile.credits),
+      loading: () => const AsyncValue.loading(),
+      error: (error, stack) => AsyncValue.error(error, stack),
+    );
     
     showDialog(
       context: context,
@@ -750,7 +786,7 @@ class _CreditsHistoryPageState extends ConsumerState<CreditsHistoryPage> {
                   onPressed: isValid
                       ? () {
                           Navigator.of(context).pop();
-                          ref.read(exchangeProvider.notifier).exchangeCreditsForTokens(inputCredits, context);
+                          ref.read(exchangeProvider.notifier).exchangeCreditsForTokens(inputCredits, context, ref);
                         }
                       : null,
                   style: ElevatedButton.styleFrom(
@@ -767,7 +803,7 @@ class _CreditsHistoryPageState extends ConsumerState<CreditsHistoryPage> {
     );
   }
 
-  String? _getValidationError(int inputCredits, ExchangeRateModel exchangeRate, AsyncValue<int> creditsAsync) {
+  String? _getValidationError(int inputCredits, ExchangeRateModel exchangeRate, AsyncValue<dynamic> creditsAsync) {
     if (inputCredits < exchangeRate.minCredits) {
       return '最少需要 ${exchangeRate.minCredits} 积分';
     }

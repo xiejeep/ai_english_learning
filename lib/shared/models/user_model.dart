@@ -21,13 +21,14 @@ class UserModel {
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'] as String,
-      username: json['username'] as String,
+      username: json['username'] as String? ?? json['email'] as String, // 如果没有username，使用email作为默认值
       email: json['email'] as String,
       phone: json['phone'] as String?,
       avatar: json['avatar'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: json['updated_at'] != null 
-          ? DateTime.parse(json['updated_at'] as String)
+      // 支持两种命名格式：驼峰命名和下划线命名
+      createdAt: DateTime.parse((json['createdAt'] ?? json['created_at']) as String),
+      updatedAt: (json['updatedAt'] ?? json['updated_at']) != null 
+          ? DateTime.parse((json['updatedAt'] ?? json['updated_at']) as String)
           : null,
     );
   }
@@ -95,4 +96,4 @@ class UserModel {
   String toString() {
     return 'UserModel(id: $id, username: $username, email: $email, phone: $phone, avatar: $avatar, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
-} 
+}

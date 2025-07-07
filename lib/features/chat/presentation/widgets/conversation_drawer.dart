@@ -5,7 +5,7 @@ import '../providers/chat_state.dart';
 import '../providers/conversation_list_provider.dart';
 import '../../domain/entities/conversation.dart';
 import '../../../../core/constants/app_constants.dart';
-import '../../../auth/presentation/providers/credits_provider.dart';
+import '../../../auth/presentation/providers/user_profile_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import 'package:go_router/go_router.dart';
 
@@ -26,8 +26,11 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
       if (conversationListState.conversations.isEmpty) {
         ref.read(conversationListProvider.notifier).loadConversations();
       }
-      // 只在抽屉首次打开时刷新token余额
-      ref.invalidate(tokenBalanceProvider);
+      // 只在抽屉首次打开时刷新用户信息（如果需要）
+      final currentState = ref.read(userProfileProvider);
+      if (currentState is! AsyncData) {
+        ref.read(userProfileProvider.notifier).loadUserProfile();
+      }
     });
   }
 
@@ -129,11 +132,11 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
               // 第二行：Token余额
               Consumer(
                 builder: (context, ref, child) {
-                  final tokenAsync = ref.watch(tokenBalanceProvider);
-                  return tokenAsync.when(
+                  final userProfileAsync = ref.watch(userProfileProvider);
+                  return userProfileAsync.when(
                     loading: () => const Text('Token余额加载中...', style: TextStyle(fontSize: 12, color: Colors.white70)),
                     error: (e, _) => Text('Token余额加载失败', style: const TextStyle(fontSize: 12, color: Colors.redAccent)),
-                    data: (token) => Text('当前Token余额：$token', style: const TextStyle(fontSize: 12, color: Colors.white)),
+                    data: (profile) => Text('当前Token余额：${profile.tokenBalance}', style: const TextStyle(fontSize: 12, color: Colors.white)),
                   );
                 },
               ),
@@ -511,4 +514,4 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
       ),
     );
   }
-} 
+}

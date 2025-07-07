@@ -12,6 +12,7 @@ import '../../../../core/storage/storage_service.dart';
 import '../../../../core/services/tts_cache_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
+import '../../../auth/presentation/providers/user_profile_provider.dart';
 
 // 聊天相关的Provider
 final chatRemoteDataSourceProvider = Provider<ChatRemoteDataSource>((ref) {
@@ -26,10 +27,11 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
 // 聊天状态管理器
 class ChatNotifier extends StateNotifier<ChatState> {
   final ChatRepository _repository;
+  final Ref _ref;
   StreamSubscription<Map<String, dynamic>>? _streamSubscription;
   static AudioPlayer? _audioPlayer;
 
-  ChatNotifier(this._repository) : super(const ChatState()) {
+  ChatNotifier(this._repository, this._ref) : super(const ChatState()) {
     _loadInitialData();
     _initAudioPlayer();
     _initTTSCache();
@@ -66,6 +68,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
             isTTSPlaying: true,
           );
           print('🔍 播放器状态监听器: 播放开始，isTTSPlaying=true');
+          
+          // TTS开始播放时刷新用户资料（表示API调用成功）
+          try {
+            _ref.read(userProfileProvider.notifier).loadUserProfile();
+            print('✅ TTS开始播放，已刷新用户资料');
+          } catch (e) {
+            print('⚠️ TTS开始播放时刷新用户资料失败: $e');
+          }
         } else if (playerState == PlayerState.stopped) {
           // 停止播放时清除播放状态
           state = state.copyWith(
@@ -477,6 +487,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
           if (state.autoPlayTTS && fullResponse.isNotEmpty) {
             playTTS(fullResponse);
           }
+          
+          // AI回复完成后，刷新用户资料（包括token余额）
+          try {
+            // 通过ref刷新用户资料
+            _ref.read(userProfileProvider.notifier).loadUserProfile();
+            print('✅ AI回复完成，已刷新用户资料');
+          } catch (e) {
+            print('⚠️ 刷新用户资料失败: $e');
+          }
         },
         onError: (error) {
           // 处理错误：移除临时AI消息，并将用户消息标记为失败
@@ -874,5 +893,5 @@ class ChatNotifier extends StateNotifier<ChatState> {
 // ChatNotifier的Provider
 final chatProvider = StateNotifierProvider<ChatNotifier, ChatState>((ref) {
   final repository = ref.read(chatRepositoryProvider);
-  return ChatNotifier(repository);
+  return ChatNotifier(repository, ref);
 });

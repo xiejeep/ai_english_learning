@@ -9,6 +9,7 @@ class MessageInput extends StatefulWidget {
   final VoidCallback? onStop;
   final String? hintText;
   final bool autofocus;
+  final bool enableInteractiveSelection;
 
   const MessageInput({
     super.key,
@@ -19,6 +20,7 @@ class MessageInput extends StatefulWidget {
     this.onStop,
     this.hintText,
     this.autofocus = false,
+    this.enableInteractiveSelection = true,
   });
 
   @override
@@ -35,6 +37,13 @@ class _MessageInputState extends State<MessageInput> {
     _focusNode = FocusNode();
     widget.controller.addListener(_onTextChanged);
     _isEmpty = widget.controller.text.trim().isEmpty;
+    
+    // 确保组件初始化时不会自动获得焦点
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !widget.autofocus) {
+        _focusNode.unfocus();
+      }
+    });
   }
 
   @override
@@ -101,6 +110,8 @@ class _MessageInputState extends State<MessageInput> {
                   controller: widget.controller,
                   focusNode: _focusNode,
                   autofocus: widget.autofocus,
+                  enableInteractiveSelection: widget.enableInteractiveSelection,
+                  canRequestFocus: widget.autofocus, // 只有在明确设置 autofocus 为 true 时才允许请求焦点
                   maxLines: null,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _handleSend(),
@@ -202,4 +213,4 @@ class _MessageInputState extends State<MessageInput> {
       ),
     );
   }
-} 
+}

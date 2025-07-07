@@ -5,7 +5,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../providers/auth_provider.dart';
 import 'package:dio/dio.dart';
 import '../../../../core/storage/storage_service.dart';
-import '../providers/credits_provider.dart';
+import '../providers/user_profile_provider.dart';
 import '../../../../shared/models/user_model.dart';
 
 final checkinStatusProvider = FutureProvider<CheckinStatus>((ref) async {
@@ -53,8 +53,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   @override
   void initState() {
     super.initState();
+    // 初始化时加载用户数据（如果还未加载）
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.invalidate(creditsBalanceProvider);
+      final currentState = ref.read(userProfileProvider);
+      if (currentState is! AsyncData) {
+        ref.read(userProfileProvider.notifier).loadUserProfile();
+      }
     });
   }
 
@@ -133,10 +137,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final checkinStatusAsync = ref.watch(checkinStatusProvider);
-    final creditsAsync = ref.watch(creditsBalanceProvider);
-    final tokenAsync = ref.watch(tokenBalanceProvider);
-    // 获取本地用户信息
+    // 获取本地用户信息 - 立即显示，无需等待网络请求
     final userMap = StorageService.getUser();
     UserModel? user;
     if (userMap != null) {
@@ -146,6 +147,23 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         print('[ProfilePage] 解析用户信息失败: $e, userMap: $userMap');
       }
     }
+    
+    // 异步数据 - 在后台加载，不阻塞UI显示
+    final checkinStatusAsync = ref.watch(checkinStatusProvider);
+    final userProfileAsync = ref.watch(userProfileProvider);
+    
+    // 从userProfile中提取积分和token数据
+    final creditsAsync = userProfileAsync.when(
+      data: (profile) => AsyncValue.data(profile.credits),
+      loading: () => const AsyncValue.loading(),
+      error: (e, s) => AsyncValue.error(e, s),
+    );
+    final tokenAsync = userProfileAsync.when(
+      data: (profile) => AsyncValue.data(profile.tokenBalance),
+      loading: () => const AsyncValue.loading(),
+      error: (e, s) => AsyncValue.error(e, s),
+    );
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('个人中心'),
@@ -219,18 +237,63 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       ],
                     ),
                   ),
-                  // 签到（右侧）
+                  // 签到（右侧）- 优化加载体验
                   checkinStatusAsync.when(
                     loading: () => Column(
-                      children: const [
-                        SizedBox(height: 8),
-                        CircularProgressIndicator(strokeWidth: 2),
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.grey, size: 20),
+                            const SizedBox(width: 4),
+                            Text('签到', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text('连续：--天', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                        const SizedBox(height: 8),
+                        ElevatedButton(
+                          onPressed: null, // 加载中时禁用
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(60, 32),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                          ),
+                          child: const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                     error: (e, _) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Icon(Icons.error, color: Colors.red),
-                        Text('加载失败', style: const TextStyle(fontSize: 12, color: Colors.red)),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.error, color: Colors.red, size: 20),
+                            const SizedBox(width: 4),
+                            Text('加载失败', style: const TextStyle(fontSize: 12, color: Colors.red)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ElevatedButton(
+                          onPressed: () => ref.invalidate(checkinStatusProvider), // 点击重试
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(60, 32),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                          ),
+                          child: const Text('重试'),
+                        ),
                       ],
                     ),
                     data: (status) => Column(
@@ -285,24 +348,30 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: creditsAsync.when(
-                loading: () => const ListTile(
-                  title:  Text('积分'),
-                  trailing: SizedBox(width: 20, height: 20, child: CircularProgressIndicator()),
+              child: ListTile(
+                title: const Text('积分'),
+                trailing: creditsAsync.when(
+                  loading: () => Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('--', style: TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 8),
+                      const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                    ],
+                  ),
+                  error: (e, _) => Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('--', style: TextStyle(fontSize: 16, color: Colors.red, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 4),
+                      Icon(Icons.refresh, size: 16, color: Colors.red),
+                    ],
+                  ),
+                  data: (credits) => Text('$credits', style: TextStyle(fontSize: 16, color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold)),
                 ),
-                error: (e, _) => const ListTile(
-                  title:  Text('积分'),
-                  trailing:  Text('--'),
-                ),
-                
-                data: (credits) => ListTile(
-                  title: const Text('积分'),
-                  trailing: Text('$credits', style: TextStyle(fontSize: 16, color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold)),
-                  onTap: () {
-                    context.push(AppConstants.creditsHistoryRoute);
-                  },
-                ),
-                
+                onTap: () {
+                  context.push(AppConstants.creditsHistoryRoute);
+                },
               ),
             ),
           ),
@@ -318,11 +387,22 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               child: ListTile(
                 title: const Text('Token'),
                 trailing: tokenAsync.when(
-                   loading: () => const ListTile(
-                  title:  Text('k'),
-                  trailing: SizedBox(width: 20, height: 20, child: CircularProgressIndicator()),
-                ),
-                  error: (e, _) => const Text('--'),
+                  loading: () => Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('--', style: TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 8),
+                      const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                    ],
+                  ),
+                  error: (e, _) => Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('--', style: TextStyle(fontSize: 16, color: Colors.red, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 4),
+                      Icon(Icons.refresh, size: 16, color: Colors.red),
+                    ],
+                  ),
                   data: (token) => Text('$token', style: TextStyle(fontSize: 16, color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold)),
                 ),
                 onTap: () {

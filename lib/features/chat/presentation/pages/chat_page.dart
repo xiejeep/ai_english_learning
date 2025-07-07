@@ -30,6 +30,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeChat();
+      // 确保页面加载时不会自动聚焦到输入框
+      FocusScope.of(context).unfocus();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 每次页面依赖变化时（包括从其他页面返回）都确保不自动聚焦
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        FocusScope.of(context).unfocus();
+      }
     });
   }
 
@@ -109,33 +122,39 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return Scaffold(
       appBar: _buildAppBar(),
       drawer: const ConversationDrawer(),
-      body: Consumer(
-        builder: (context, ref, child) {
-          final chatState = ref.watch(chatProvider);
-
-          // 加载中时显示全屏加载指示器
-          if (chatState.status == ChatStatus.loading) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          }
-
-          // 网络错误时显示友好的错误界面
-          if (chatState.status == ChatStatus.error) {
-            return _buildErrorWidget(chatState.error ?? '未知错误');
-          }
-
-          return Column(
-            children: [
-              // 聊天消息列表
-              Expanded(
-                child: _buildMessagesList(chatState),
-              ),
-              // 消息输入框
-              _buildMessageInput(chatState),
-            ],
-          );
+      body: GestureDetector(
+        onTap: () {
+          // 点击页面其他地方时取消焦点，收起键盘
+          FocusScope.of(context).unfocus();
         },
+        child: Consumer(
+          builder: (context, ref, child) {
+            final chatState = ref.watch(chatProvider);
+
+            // 加载中时显示全屏加载指示器
+            if (chatState.status == ChatStatus.loading) {
+              return const Center(
+                child: CircularProgressIndicator(),
+              );
+            }
+
+            // 网络错误时显示友好的错误界面
+            if (chatState.status == ChatStatus.error) {
+              return _buildErrorWidget(chatState.error ?? '未知错误');
+            }
+
+            return Column(
+              children: [
+                // 聊天消息列表
+                Expanded(
+                  child: _buildMessagesList(chatState),
+                ),
+                // 消息输入框
+                _buildMessageInput(chatState),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -335,6 +354,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         ? '创建会话中...' 
         : '输入你想练习的内容...',
       autofocus: false,
+      enableInteractiveSelection: true,
     );
   }
 
