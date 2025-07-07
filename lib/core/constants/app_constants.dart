@@ -7,7 +7,7 @@ class AppConstants {
   
   // API配置
   // static const String baseUrl = 'https://api.classhorse.cn/';
-  static const String baseUrl = 'http://192.168.0.55:3000/';
+  static const String baseUrl = 'http://192.168.0.52:3000/';
   static const String apiVersion = 'v1';
   
   // API路径

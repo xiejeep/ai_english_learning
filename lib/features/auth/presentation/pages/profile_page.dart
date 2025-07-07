@@ -48,6 +48,8 @@ class ProfilePage extends ConsumerStatefulWidget {
 }
 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
+  bool _isCheckingIn = false;
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +59,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   Future<void> _doCheckin(BuildContext context, WidgetRef ref) async {
+    if (_isCheckingIn) return; // 防止重复点击
+    
+    setState(() {
+      _isCheckingIn = true;
+    });
+    
     final dio = Dio();
     final token = StorageService.getUserToken();
     if (token == null) {
@@ -64,6 +72,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('未登录，无法签到')),
       );
+      setState(() {
+        _isCheckingIn = false;
+      });
       return;
     }
     try {
@@ -113,6 +124,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(errorMsg)),
       );
+    } finally {
+      setState(() {
+        _isCheckingIn = false;
+      });
     }
   }
 
@@ -237,14 +252,23 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         Text('连续：${status.consecutiveDays}天', style: const TextStyle(fontSize: 12)),
                         const SizedBox(height: 8),
                         ElevatedButton(
-                          onPressed: status.hasCheckedIn ? null : () => _doCheckin(context, ref),
+                          onPressed: (status.hasCheckedIn || _isCheckingIn) ? null : () => _doCheckin(context, ref),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: status.hasCheckedIn ? Colors.grey : Theme.of(context).primaryColor,
+                            backgroundColor: (status.hasCheckedIn || _isCheckingIn) ? Colors.grey : Theme.of(context).primaryColor,
                             foregroundColor: Colors.white,
                             minimumSize: const Size(60, 32),
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                           ),
-                          child: Text(status.hasCheckedIn ? '已签到' : '签到'),
+                          child: _isCheckingIn 
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : Text(status.hasCheckedIn ? '已签到' : '签到'),
                         ),
                       ],
                     ),
@@ -274,7 +298,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 data: (credits) => ListTile(
                   title: const Text('积分'),
                   trailing: Text('$credits', style: TextStyle(fontSize: 16, color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold)),
-                  
+                  onTap: () {
+                    context.push(AppConstants.creditsHistoryRoute);
+                  },
                 ),
                 
               ),
@@ -292,12 +318,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               child: ListTile(
                 title: const Text('Token'),
                 trailing: tokenAsync.when(
-                  loading: () => const SizedBox(width: 60, child: LinearProgressIndicator()),
+                   loading: () => const ListTile(
+                  title:  Text('k'),
+                  trailing: SizedBox(width: 20, height: 20, child: CircularProgressIndicator()),
+                ),
                   error: (e, _) => const Text('--'),
                   data: (token) => Text('$token', style: TextStyle(fontSize: 16, color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold)),
                 ),
                 onTap: () {
-                  context.push(AppConstants.creditsHistoryRoute);
+                  context.push(AppConstants.tokenUsageRoute);
                 },
               ),
             ),
@@ -308,4 +337,4 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       ),
     );
   }
-} 
+}

@@ -1,5 +1,6 @@
 import 'package:ai_english_learning/features/auth/presentation/pages/profile_page.dart';
 import 'package:ai_english_learning/features/auth/presentation/pages/token_history_page.dart';
+import 'package:ai_english_learning/features/auth/presentation/pages/credits_history_page.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
@@ -33,6 +34,10 @@ class AppRouter {
         ),
       GoRoute(
         path: AppConstants.creditsHistoryRoute,
+        builder: (context, state) => const CreditsHistoryPage(),
+      ),
+      GoRoute(
+        path: AppConstants.tokenUsageRoute,
         builder: (context, state) => const TokenHistoryPage(),
       ),
     ],
