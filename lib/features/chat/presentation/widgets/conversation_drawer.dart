@@ -24,7 +24,8 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final conversationListState = ref.read(conversationListProvider);
       if (conversationListState.conversations.isEmpty) {
-        ref.read(conversationListProvider.notifier).loadConversations();
+        final chatState = ref.read(chatProvider);
+        ref.read(conversationListProvider.notifier).loadConversations(appId: chatState.appId);
       }
       // 只在抽屉首次打开时刷新用户信息（如果需要）
       final currentState = ref.read(userProfileProvider);
@@ -190,7 +191,8 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
                     onPressed: () {
-                      ref.read(conversationListProvider.notifier).loadConversations();
+                      final chatState = ref.read(chatProvider);
+                      ref.read(conversationListProvider.notifier).loadConversations(appId: chatState.appId);
                     },
                     icon: const Icon(Icons.refresh),
                     label: const Text('重试'),
@@ -470,9 +472,11 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
             onPressed: () {
               final newName = controller.text.trim();
               if (newName.isNotEmpty && newName != conversation.displayName) {
+                final appId = ref.read(chatProvider).appId;
                 ref.read(conversationListProvider.notifier).updateConversationName(
                   conversation.id,
                   newName,
+                  appId: appId,
                 );
               }
               Navigator.pop(context);
@@ -498,7 +502,8 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
           TextButton(
             onPressed: () {
               // 从会话列表中删除
-              ref.read(conversationListProvider.notifier).deleteConversation(conversation.id);
+              final appId = ref.read(chatProvider).appId;
+              ref.read(conversationListProvider.notifier).deleteConversation(conversation.id, appId: appId);
               Navigator.pop(context);
               
               // 如果删除的是当前对话，创建新对话

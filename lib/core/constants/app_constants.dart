@@ -6,8 +6,8 @@ class AppConstants {
   static const String appVersion = '1.0.0';
   
   // API配置
-  // static const String baseUrl = 'https://api.classhorse.cn/';
-  static const String baseUrl = 'http://192.168.0.52:3000/';
+  static const String baseUrl = 'https://api.classhorse.cn/';
+  // static const String baseUrl = 'http://192.168.8.167:3000/';
   static const String apiVersion = 'v1';
   
   // API路径
@@ -22,6 +22,8 @@ class AppConstants {
   static const String difychatPath = '/api/dify/chat-messages';
   static const String difyTtsPath = '/api/dify/text-to-audio';
   static const String difyConversationsPath = '/api/dify/conversations';
+  static const String difyTokenUsageHistoryPath = '/api/dify/token-usage-history';
+  static const String difyAppsPath = '/api/user/dify-apps';
   
   // 主题颜色
   static const Color primaryColor = Color.fromARGB(255, 47, 33, 28);

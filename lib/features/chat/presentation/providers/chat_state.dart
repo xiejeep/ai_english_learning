@@ -25,6 +25,9 @@ class ChatState {
   // TTS状态：简化为只需要加载状态和播放状态
   final bool isTTSLoading;
   final bool isTTSPlaying;
+  // 当前选择的Dify应用ID
+  final String? appId;
+  final String? appName;
 
   const ChatState({
     this.status = ChatStatus.initial,
@@ -39,6 +42,8 @@ class ChatState {
     this.firstId,
     this.isTTSLoading = false,
     this.isTTSPlaying = false,
+    this.appId,
+    this.appName,
   });
 
   ChatState copyWith({
@@ -54,6 +59,8 @@ class ChatState {
     String? firstId,
     bool? isTTSLoading,
     bool? isTTSPlaying,
+    String? appId,
+    String? appName,
   }) {
     return ChatState(
       status: status ?? this.status,
@@ -68,6 +75,8 @@ class ChatState {
       firstId: firstId ?? this.firstId,
       isTTSLoading: isTTSLoading ?? this.isTTSLoading,
       isTTSPlaying: isTTSPlaying ?? this.isTTSPlaying,
+      appId: appId ?? this.appId,
+      appName: appName ?? this.appName,
     );
   }
 
@@ -146,7 +155,9 @@ class ChatState {
         other.hasMoreMessages == hasMoreMessages &&
         other.firstId == firstId &&
         other.isTTSLoading == isTTSLoading &&
-        other.isTTSPlaying == isTTSPlaying;
+        other.isTTSPlaying == isTTSPlaying &&
+        other.appId == appId &&
+        other.appName == appName;
   }
 
   @override
@@ -162,6 +173,8 @@ class ChatState {
         hasMoreMessages.hashCode ^
         firstId.hashCode ^
         isTTSLoading.hashCode ^
-        isTTSPlaying.hashCode;
+        isTTSPlaying.hashCode ^
+        appId.hashCode ^
+        appName.hashCode;
   }
 }

@@ -48,12 +48,12 @@ class ConversationListNotifier extends StateNotifier<ConversationListState> {
   ConversationListNotifier(this._repository) : super(const ConversationListState());
 
   // 加载会话列表
-  Future<void> loadConversations() async {
+  Future<void> loadConversations({String? appId}) async {
     try {
-      print('🔄 [会话列表] 开始加载会话列表...');
+      print('🔄 [会话列表] 开始加载会话列表... appId=$appId');
       state = state.setLoading();
       
-      final conversations = await _repository.getConversations();
+      final conversations = await _repository.getConversations(appId: appId);
       
       print('✅ [会话列表] 成功加载会话列表，共 ${conversations.length} 个会话');
       for (int i = 0; i < conversations.length; i++) {
@@ -89,9 +89,9 @@ class ConversationListNotifier extends StateNotifier<ConversationListState> {
   }
 
   // 删除会话
-  Future<void> deleteConversation(String conversationId) async {
+  Future<void> deleteConversation(String conversationId, {String? appId}) async {
     try {
-      await _repository.deleteConversation(conversationId);
+      await _repository.deleteConversation(conversationId, appId: appId);
       
       // 从列表中移除已删除的会话
       final updatedConversations = state.conversations
@@ -110,9 +110,9 @@ class ConversationListNotifier extends StateNotifier<ConversationListState> {
   }
 
   // 更新会话标题
-  Future<void> updateConversationTitle(String conversationId, String title) async {
+  Future<void> updateConversationTitle(String conversationId, String title, {String? appId}) async {
     try {
-      await _repository.updateConversationTitle(conversationId, title);
+      await _repository.updateConversationTitle(conversationId, title, appId: appId);
       
       // 更新本地列表中的会话标题
       final updatedConversations = state.conversations.map((conv) {
@@ -134,9 +134,9 @@ class ConversationListNotifier extends StateNotifier<ConversationListState> {
   }
 
   // 更新会话名称
-  Future<void> updateConversationName(String conversationId, String name) async {
+  Future<void> updateConversationName(String conversationId, String name, {String? appId}) async {
     try {
-      await _repository.updateConversationName(conversationId, name);
+      await _repository.updateConversationName(conversationId, name, appId: appId);
       
       // 更新本地列表中的会话名称
       final updatedConversations = state.conversations.map((conv) {
@@ -158,8 +158,8 @@ class ConversationListNotifier extends StateNotifier<ConversationListState> {
   }
 
   // 刷新会话列表（强制重新加载）
-  Future<void> refreshConversations() async {
-    await loadConversations();
+  Future<void> refreshConversations({String? appId}) async {
+    await loadConversations(appId: appId);
   }
 
   // 清除错误状态
@@ -180,4 +180,4 @@ final conversationListRepositoryProvider = Provider<ChatRepository>((ref) {
 final conversationListProvider = StateNotifierProvider<ConversationListNotifier, ConversationListState>((ref) {
   final repository = ref.read(conversationListRepositoryProvider);
   return ConversationListNotifier(repository);
-}); 
+});

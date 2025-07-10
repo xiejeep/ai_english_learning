@@ -20,11 +20,13 @@ class ChatRemoteDataSource {
     required String message,
     required String conversationId,
     required String userId,
+    String? appId,
   }) async* {
     await for (final data in sendMessageStreamWithConversationId(
       message: message,
       conversationId: conversationId,
       userId: userId,
+      appId: appId,
     )) {
       final content = data['content'] as String?;
       if (content != null && content.isNotEmpty) {
@@ -38,19 +40,45 @@ class ChatRemoteDataSource {
     required String message,
     required String conversationId,
     required String userId,
+    String? appId,
+  }) async* {
+    await for (final data in sendMessageStreamWithConversationIdAndType(
+      message: message,
+      conversationId: conversationId,
+      userId: userId,
+      type: '',
+      appId: appId,
+    )) {
+      yield data;
+    }
+  }
+  
+  // 带类型参数的流式响应
+  Stream<Map<String, dynamic>> sendMessageStreamWithConversationIdAndType({
+    required String message,
+    required String conversationId,
+    required String userId,
+    required String type,
+    String? appId,
   }) async* {
     try {
       _cancelToken = CancelToken();
       
+      final Map<String, dynamic> requestData = {
+        'inputs': type.isNotEmpty ? {'type': type} : {},
+        'query': message,
+        'response_mode': 'streaming',
+        'conversation_id': conversationId, // 总是传递字符串，空时为 ""
+        'user': userId,
+      };
+      
+      if (appId != null && appId.isNotEmpty) {
+        requestData['appId'] = appId;
+      }
+      
       final response = await _dio.post(
         AppConstants.difychatPath,
-        data: {
-          'inputs': {},
-          'query': message,
-          'response_mode': 'streaming',
-          'conversation_id': conversationId, // 总是传递字符串，空时为 ""
-          'user': userId,
-        },
+        data: requestData,
         options: Options(
           responseType: ResponseType.stream,
         ),
@@ -197,16 +225,22 @@ class ChatRemoteDataSource {
   }
   
   // 获取TTS音频（直接接收二进制数据）
-  Future<String> getTTSAudio(String text) async {
+  Future<String> getTTSAudio(String text, {String? appId}) async {
     try {
       print('开始获取TTS音频: "${text.length > 50 ? text.substring(0, 50) + "..." : text}"');
       
+      final Map<String, dynamic> requestData = {
+        'text': text,
+        'user': 'default_user',
+      };
+      
+      if (appId != null && appId.isNotEmpty) {
+        requestData['appId'] = appId;
+      }
+      
       final response = await _dio.post(
         AppConstants.difyTtsPath,
-        data: {
-          'text': text,
-          'user': 'default_user',
-        },
+        data: requestData,
         options: Options(
           responseType: ResponseType.bytes, // 直接接收二进制数据
           headers: {
@@ -331,7 +365,7 @@ class ChatRemoteDataSource {
       // 尝试使用备用方法获取TTS
       try {
         print('尝试使用JSON格式获取TTS音频...');
-        return await _getTTSAudioAsJson(text);
+        return await _getTTSAudioAsJson(text, appId: appId);
       } catch (jsonError) {
         print('JSON方法也失败: $jsonError');
         throw Exception('获取TTS音频失败: ${e.message}');
@@ -340,13 +374,19 @@ class ChatRemoteDataSource {
   }
 
   // 备用TTS获取方法：以JSON格式接收
-  Future<String> _getTTSAudioAsJson(String text) async {
+  Future<String> _getTTSAudioAsJson(String text, {String? appId}) async {
+    final Map<String, dynamic> requestData = {
+      'text': text,
+      'user': 'default_user',
+    };
+    
+    if (appId != null && appId.isNotEmpty) {
+      requestData['appId'] = appId;
+    }
+    
     final response = await _dio.post(
       AppConstants.difyTtsPath,
-      data: {
-        'text': text,
-        'user': 'default_user',
-      },
+      data: requestData,
       options: Options(
         responseType: ResponseType.json,
         headers: {
@@ -445,12 +485,18 @@ class ChatRemoteDataSource {
 
 
   // 获取会话列表
-  Future<List<Map<String, dynamic>>> getConversations() async {
+  Future<List<Map<String, dynamic>>> getConversations({String? appId}) async {
     try {
-      print('🚀 请求会话列表: GET /api/dify/conversations');
+      final Map<String, dynamic> queryParams = {};
+      if (appId != null && appId.isNotEmpty) {
+        queryParams['appId'] = appId;
+      }
+      
+      print('🚀 请求会话列表: GET ${AppConstants.difyConversationsPath}${queryParams.isNotEmpty ? '?${queryParams.entries.map((e) => '${e.key}=${e.value}').join('&')}' : ''}');
       
       final response = await _dio.get(
-        '/api/dify/conversations',
+        AppConstants.difyConversationsPath,
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
         options: Options(
           headers: {
             'Content-Type': 'application/json',
@@ -492,13 +538,18 @@ class ChatRemoteDataSource {
   }
 
   // 获取最新的会话（优化版本，只返回1条记录）
-  Future<Map<String, dynamic>?> getLatestConversation() async {
+  Future<Map<String, dynamic>?> getLatestConversation({String? appId}) async {
     try {
-      print('🚀 请求最新会话: GET /api/dify/conversations?limit=1');
+      final Map<String, dynamic> queryParams = {'limit': 1};
+      if (appId != null && appId.isNotEmpty) {
+        queryParams['appId'] = appId;
+      }
+      
+      print('🚀 请求最新会话: GET ${AppConstants.difyConversationsPath}?${queryParams.entries.map((e) => '${e.key}=${e.value}').join('&')}');
       
       final response = await _dio.get(
-        '/api/dify/conversations',
-        queryParameters: {'limit': 1}, // 只获取最新的1条会话
+        AppConstants.difyConversationsPath,
+        queryParameters: queryParams,
         options: Options(
           headers: {
             'Content-Type': 'application/json',
@@ -541,12 +592,18 @@ class ChatRemoteDataSource {
   }
 
   // 删除会话
-  Future<bool> deleteConversation(String conversationId) async {
+  Future<bool> deleteConversation(String conversationId, {String? appId}) async {
     try {
-      print('🚀 删除会话请求: DELETE /api/dify/conversations/$conversationId');
+      final Map<String, dynamic> queryParams = {};
+      if (appId != null && appId.isNotEmpty) {
+        queryParams['appId'] = appId;
+      }
+      
+      print('🚀 删除会话请求: DELETE ${AppConstants.difyConversationsPath}/$conversationId${queryParams.isNotEmpty ? '?${queryParams.entries.map((e) => '${e.key}=${e.value}').join('&')}' : ''}');
       
       final response = await _dio.delete(
-        '/api/dify/conversations/$conversationId',
+        '${AppConstants.difyConversationsPath}/$conversationId',
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
         options: Options(
           headers: {
             'Content-Type': 'application/json',
@@ -576,13 +633,19 @@ class ChatRemoteDataSource {
   }
 
   // 重命名会话
-  Future<bool> renameConversation(String conversationId, String name) async {
+  Future<bool> renameConversation(String conversationId, String name, {String? appId}) async {
     try {
-      print('🚀 重命名会话请求: POST /api/dify/conversations/$conversationId/name');
+      final Map<String, dynamic> queryParams = {};
+      if (appId != null && appId.isNotEmpty) {
+        queryParams['appId'] = appId;
+      }
+      
+      print('🚀 重命名会话请求: POST ${AppConstants.difyConversationsPath}/$conversationId/name${queryParams.isNotEmpty ? '?${queryParams.entries.map((e) => '${e.key}=${e.value}').join('&')}' : ''}');
       print('📦 请求体: {"name": "$name"}');
       
       final response = await _dio.post(
-        '/api/dify/conversations/$conversationId/name',
+        '${AppConstants.difyConversationsPath}/$conversationId/name',
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
         data: {
           'name': name,
         },
@@ -615,12 +678,18 @@ class ChatRemoteDataSource {
   }
 
   // 获取会话消息
-  Future<List<Map<String, dynamic>>> getConversationMessages(String conversationId) async {
+  Future<List<Map<String, dynamic>>> getConversationMessages(String conversationId, {String? appId}) async {
     try {
-      print('🚀 获取会话消息请求: GET /api/dify/conversations/$conversationId/messages');
+      final Map<String, dynamic> queryParams = {};
+      if (appId != null && appId.isNotEmpty) {
+        queryParams['appId'] = appId;
+      }
+      
+      print('🚀 获取会话消息请求: GET ${AppConstants.difyConversationsPath}/$conversationId/messages${queryParams.isNotEmpty ? '?${queryParams.entries.map((e) => '${e.key}=${e.value}').join('&')}' : ''}');
       
       final response = await _dio.get(
-        '/api/dify/conversations/$conversationId/messages',
+        '${AppConstants.difyConversationsPath}/$conversationId/messages',
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
         options: Options(
           headers: {
             'Content-Type': 'application/json',
@@ -702,9 +771,10 @@ class ChatRemoteDataSource {
     String conversationId, {
     int? limit,
     String? firstId,
+    String? appId,
   }) async {
     try {
-      print('🔍 [DEBUG] DataSource收到分页请求: conversationId=$conversationId');
+      print('🔍 [DEBUG] DataSource收到分页请求: conversationId=$conversationId, appId=$appId');
       print('🔍 [DEBUG] 参数详情: limit=$limit, firstId=$firstId');
       print('🔍 [DEBUG] firstId检查: isNull=${firstId == null}, isEmpty=${firstId?.isEmpty ?? true}, value="$firstId"');
       
@@ -719,12 +789,16 @@ class ChatRemoteDataSource {
       } else {
         print('🔍 [DEBUG] firstId为空，不添加first_id参数: firstId=$firstId');
       }
+      if (appId != null && appId.isNotEmpty) {
+        queryParams['appId'] = appId;
+        print('🔍 [DEBUG] 添加appId参数: $appId');
+      }
       
       print('🔍 [DEBUG] 最终查询参数: $queryParams');
-      print('🚀 获取会话消息请求: GET /api/dify/conversations/$conversationId/messages${queryParams.isNotEmpty ? '?${queryParams.entries.map((e) => '${e.key}=${e.value}').join('&')}' : ''}');
+      print('🚀 获取会话消息请求: GET ${AppConstants.difyConversationsPath}/$conversationId/messages${queryParams.isNotEmpty ? '?${queryParams.entries.map((e) => '${e.key}=${e.value}').join('&')}' : ''}');
       
       final response = await _dio.get(
-        '/api/dify/conversations/$conversationId/messages',
+        '${AppConstants.difyConversationsPath}/$conversationId/messages',
         queryParameters: queryParams.isNotEmpty ? queryParams : null,
         options: Options(
           headers: {
@@ -813,12 +887,18 @@ class ChatRemoteDataSource {
   }
 
   // 获取token使用历史
-  Future<List<Map<String, dynamic>>> getTokenUsageHistory() async {
+  Future<List<Map<String, dynamic>>> getTokenUsageHistory({String? appId}) async {
     try {
-      print('🚀 获取token使用历史请求: GET /api/dify/token-usage-history');
+      final Map<String, dynamic> queryParams = {};
+      if (appId != null && appId.isNotEmpty) {
+        queryParams['appId'] = appId;
+      }
+      
+      print('🚀 获取token使用历史请求: GET ${AppConstants.difyTokenUsageHistoryPath}${queryParams.isNotEmpty ? '?${queryParams.entries.map((e) => '${e.key}=${e.value}').join('&')}' : ''}');
       
       final response = await _dio.get(
-        '/api/dify/token-usage-history',
+        AppConstants.difyTokenUsageHistoryPath,
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
         options: Options(
           headers: {
             'Content-Type': 'application/json',

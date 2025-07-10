@@ -15,7 +15,11 @@ import '../../../auth/presentation/providers/auth_state.dart';
 import '../../../../shared/models/message_model.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
-  const ChatPage({super.key});
+  final String? type;
+  final String? appId;
+  final String? appName;
+  
+  const ChatPage({super.key, this.type, this.appId, this.appName});
 
   @override
   ConsumerState<ChatPage> createState() => _ChatPageState();
@@ -38,12 +42,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // 每次页面依赖变化时（包括从其他页面返回）都确保不自动聚焦
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        FocusScope.of(context).unfocus();
-      }
-    });
+    // 移除自动取消焦点的逻辑，允许用户正常使用输入框
   }
 
   @override
@@ -54,12 +53,22 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   void _initializeChat() async {
+    // 设置appId和appName到ChatState中
+    if (widget.appId != null || widget.appName != null) {
+      ref.read(chatProvider.notifier).setAppInfo(widget.appId, widget.appName);
+    }
     // 使用provider中的初始化方法，包含更好的错误处理
     await ref.read(chatProvider.notifier).initializeChat();
   }
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () {
+          context.pop();
+        },
+      ),
       title: Consumer(
         builder: (context, ref, child) {
           final chatState = ref.watch(chatProvider);
@@ -86,6 +95,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       foregroundColor: Colors.white,
       elevation: 0,
       actions: [
+        // 会话列表按钮
+        Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.chat_bubble_outline),
+            tooltip: '会话列表',
+            onPressed: () {
+              Scaffold.of(context).openDrawer();
+            },
+          ),
+        ),
         // 个人中心按钮
         IconButton(
           icon: const Icon(Icons.person_outline),
@@ -365,8 +384,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     // 先收起键盘
     FocusScope.of(context).unfocus();
 
-    // 发送消息
-    ref.read(chatProvider.notifier).sendMessageStream(content);
+    // 发送消息，如果有type参数则传递
+    if (widget.type != null) {
+      ref.read(chatProvider.notifier).sendMessageStreamWithType(content, widget.type!);
+    } else {
+      ref.read(chatProvider.notifier).sendMessageStream(content);
+    }
     
     // 清空输入框
     _messageController.clear();

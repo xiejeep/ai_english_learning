@@ -17,11 +17,13 @@ class ChatRepositoryImpl implements ChatRepository {
   Stream<String> sendMessageStream({
     required String message,
     required String conversationId,
+    String? appId,
   }) {
     return _remoteDataSource.sendMessageStream(
       message: message,
       conversationId: conversationId,
       userId: _getCurrentUserId(),
+      appId: appId,
     );
   }
 
@@ -29,11 +31,29 @@ class ChatRepositoryImpl implements ChatRepository {
   Stream<Map<String, dynamic>> sendMessageStreamWithConversationId({
     required String message,
     required String conversationId,
+    String? appId,
   }) {
     return _remoteDataSource.sendMessageStreamWithConversationId(
       message: message,
       conversationId: conversationId,
       userId: _getCurrentUserId(),
+      appId: appId,
+    );
+  }
+  
+  @override
+  Stream<Map<String, dynamic>> sendMessageStreamWithConversationIdAndType({
+    required String message,
+    required String conversationId,
+    required String type,
+    String? appId,
+  }) {
+    return _remoteDataSource.sendMessageStreamWithConversationIdAndType(
+      message: message,
+      conversationId: conversationId,
+      userId: _getCurrentUserId(),
+      type: type,
+      appId: appId,
     );
   }
 
@@ -45,14 +65,14 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Future<String> getTTSAudio(String text) async {
-    return await _remoteDataSource.getTTSAudio(text);
+  Future<String> getTTSAudio(String text, {String? appId}) async {
+    return await _remoteDataSource.getTTSAudio(text, appId: appId);
   }
 
   @override
-  Future<List<MessageModel>> getMessages(String conversationId) async {
+  Future<List<MessageModel>> getMessages(String conversationId, {String? appId}) async {
     // 直接从远程API获取会话消息
-    final messagesData = await _remoteDataSource.getConversationMessages(conversationId);
+    final messagesData = await _remoteDataSource.getConversationMessages(conversationId, appId: appId);
     
     // 将API响应转换为MessageModel
     final messages = messagesData.map((data) {
@@ -83,14 +103,16 @@ class ChatRepositoryImpl implements ChatRepository {
     String conversationId, {
     int? limit,
     String? firstId,
+    String? appId,
   }) async {
-    print('🔍 [DEBUG] Repository收到分页请求: conversationId=$conversationId, limit=$limit, firstId=$firstId');
+    print('🔍 [DEBUG] Repository收到分页请求: conversationId=$conversationId, limit=$limit, firstId=$firstId, appId=$appId');
     
     // 从远程数据源获取消息
     final result = await _remoteDataSource.getConversationMessagesWithPagination(
       conversationId,
       limit: limit,
       firstId: firstId,
+      appId: appId,
     );
     
     final messagesData = result['messages'] as List<Map<String, dynamic>>;
@@ -144,9 +166,9 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Future<List<Conversation>> getConversations() async {
+  Future<List<Conversation>> getConversations({String? appId}) async {
     // 直接从远程API获取会话列表
-    final conversationsData = await _remoteDataSource.getConversations();
+    final conversationsData = await _remoteDataSource.getConversations(appId: appId);
     
     // 将API响应转换为Conversation实体
     final conversations = conversationsData.map((data) {
@@ -186,26 +208,26 @@ class ChatRepositoryImpl implements ChatRepository {
   }
   
   @override
-  Future<void> deleteConversation(String conversationId) async {
-    await _remoteDataSource.deleteConversation(conversationId);
+  Future<void> deleteConversation(String conversationId, {String? appId}) async {
+    await _remoteDataSource.deleteConversation(conversationId, appId: appId);
   }
   
   @override
-  Future<void> updateConversationTitle(String conversationId, String title) async {
-    await _remoteDataSource.renameConversation(conversationId, title);
+  Future<void> updateConversationTitle(String conversationId, String title, {String? appId}) async {
+    await _remoteDataSource.renameConversation(conversationId, title, appId: appId);
   }
 
   @override
-  Future<void> updateConversationName(String conversationId, String name) async {
-    await _remoteDataSource.renameConversation(conversationId, name);
+  Future<void> updateConversationName(String conversationId, String name, {String? appId}) async {
+    await _remoteDataSource.renameConversation(conversationId, name, appId: appId);
   }
 
   @override
-  Future<Conversation?> getLatestConversation() async {
-    print('🚀 开始加载最新会话...');
+  Future<Conversation?> getLatestConversation({String? appId}) async {
+    print('🚀 开始加载最新会话... appId=$appId');
     
     // 直接从远程API获取最新会话
-    final latestConversationData = await _remoteDataSource.getLatestConversation();
+    final latestConversationData = await _remoteDataSource.getLatestConversation(appId: appId);
     
     if (latestConversationData != null) {
       // 处理时间戳转换（API返回的是秒级时间戳）

@@ -411,6 +411,26 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               ),
             ),
           ),
+          const SizedBox(height: 12),
+          // 设置 ListTile（白色卡片）
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ListTile(
+                leading: Icon(Icons.settings, color: Theme.of(context).primaryColor),
+                title: const Text('设置'),
+                subtitle: const Text('应用设置和偏好配置'),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  context.push(AppConstants.settingsRoute);
+                },
+              ),
+            ),
+          ),
        
           const SizedBox(height: 24),
         ],

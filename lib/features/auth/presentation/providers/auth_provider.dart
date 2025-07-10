@@ -76,9 +76,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final statusCode = e.response!.statusCode;
         final responseData = e.response!.data;
         
+        // 优先使用服务器返回的具体错误消息
         if (responseData is Map<String, dynamic> && responseData['message'] != null) {
           errorMessage = responseData['message'];
         } else {
+          // 如果没有具体消息，使用默认错误消息
           switch (statusCode) {
             case 400:
               errorMessage = '请求参数错误，请检查输入信息';
