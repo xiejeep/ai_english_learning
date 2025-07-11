@@ -353,8 +353,13 @@ class HomePage extends ConsumerWidget {
       ),
       child: InkWell(
         onTap: app.enabled ? () {
-          // 跳转到聊天页面，传递应用ID
-          context.push('${AppConstants.chatRoute}?appId=${app.id}&appName=${Uri.encodeComponent(app.name)}');
+          // 检查应用名称，如果是linguabot则跳转到空白页面
+          if (app.name.toLowerCase() == 'linguabot') {
+            context.push('${AppConstants.blankRoute}?appId=${app.id}&appName=${Uri.encodeComponent(app.name)}');
+          } else {
+            // 跳转到聊天页面，传递应用ID
+            context.push('${AppConstants.chatRoute}?appId=${app.id}&appName=${Uri.encodeComponent(app.name)}');
+          }
         } : null,
         borderRadius: BorderRadius.circular(16),
         child: Opacity(

@@ -44,6 +44,7 @@ class AppConstants {
   static const String checkinRoute = '/checkin';
   static const String settingsRoute = '/settings';
   static const String voiceSettingsRoute = '/voice-settings';
+  static const String blankRoute = '/blank';
   
   // 存储键名
   static const String tokenKey = 'user_token';

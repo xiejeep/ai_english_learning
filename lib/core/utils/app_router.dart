@@ -2,6 +2,7 @@ import 'package:ai_english_learning/features/auth/presentation/pages/profile_pag
 import 'package:ai_english_learning/features/auth/presentation/pages/token_history_page.dart';
 import 'package:ai_english_learning/features/auth/presentation/pages/credits_history_page.dart';
 import 'package:ai_english_learning/features/auth/presentation/pages/settings_page.dart';
+import 'package:ai_english_learning/features/home/presentation/pages/blank_page.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
@@ -54,6 +55,15 @@ class AppRouter {
       GoRoute(
         path: AppConstants.settingsRoute,
         builder: (context, state) => const SettingsPage(),
+      ),
+      GoRoute(
+        path: AppConstants.blankRoute,
+        builder: (context, state) {
+          final type = state.uri.queryParameters['type'];
+          final appId = state.uri.queryParameters['appId'];
+          final appName = state.uri.queryParameters['appName'];
+          return BlankPage(type: type, appId: appId, appName: appName);
+        },
       ),
     ],
   );
