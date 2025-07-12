@@ -22,10 +22,6 @@ class _DictionaryPageState extends State<DictionaryPage> {
   DictionaryInfo? _selectedDictionary;
   bool _isDictionariesLoading = true;
   
-  // 搜索建议相关
-  List<String> _suggestions = [];
-  bool _isSuggestionsLoading = false;
-  
   // 搜索关键词相关
   late TextEditingController _searchController;
   String _currentSearchWord = '';
@@ -54,16 +50,14 @@ class _DictionaryPageState extends State<DictionaryPage> {
           _selectedDictionary = _dictionaries.first;
         }
       });
-      // 加载完词典列表后开始查词和获取建议
+      // 加载完词典列表后开始查词
       _lookupWord();
-      _loadSuggestions();
     } catch (e) {
       setState(() {
         _isDictionariesLoading = false;
       });
       // 即使获取词典列表失败，也尝试使用默认词典查词
       _lookupWord();
-      _loadSuggestions();
     }
   }
 
@@ -112,7 +106,26 @@ class _DictionaryPageState extends State<DictionaryPage> {
                 },
                 onNavigationRequest: (NavigationRequest request) {
                   print('🔗 导航请求: ${request.url}');
-                  return NavigationDecision.navigate;
+                  
+                  // 阻止entry://等非HTTP协议的跳转
+                  if (request.url.startsWith('entry://') || 
+                      request.url.startsWith('sound://') ||
+                      (!request.url.startsWith('http://') && 
+                       !request.url.startsWith('https://') && 
+                       !request.url.startsWith('about:'))) {
+                    print('🚫 阻止非HTTP协议跳转: ${request.url}');
+                    return NavigationDecision.prevent;
+                  }
+                  
+                  // 只允许about:blank和资源URL
+                  if (request.url == 'about:blank' || 
+                      request.url.contains('/api/dictionary/resource/')) {
+                    return NavigationDecision.navigate;
+                  }
+                  
+                  // 阻止其他外部链接跳转
+                  print('🚫 阻止外部链接跳转: ${request.url}');
+                  return NavigationDecision.prevent;
                 },
               ),
             )
@@ -133,44 +146,12 @@ class _DictionaryPageState extends State<DictionaryPage> {
     }
   }
 
-  Future<void> _loadSuggestions() async {
-    setState(() {
-      _isSuggestionsLoading = true;
-    });
-
-    try {
-      final suggestions = await DictionaryService.instance.getSuggestions(
-        _currentSearchWord,
-        dictionaryId: _selectedDictionary?.id,
-      );
-      setState(() {
-        _suggestions = (suggestions ?? []).take(5).toList(); // 最多5条
-        _isSuggestionsLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _suggestions = [];
-        _isSuggestionsLoading = false;
-      });
-    }
-  }
-
-  void _onSuggestionTap(String suggestion) {
-    setState(() {
-      _currentSearchWord = suggestion;
-      _searchController.text = suggestion;
-    });
-    _lookupWord(customWord: suggestion);
-    _loadSuggestions();
-  }
-  
   void _onSearchSubmitted(String value) {
     if (value.trim().isNotEmpty && value.trim() != _currentSearchWord) {
       setState(() {
         _currentSearchWord = value.trim();
       });
       _lookupWord(customWord: value.trim());
-      _loadSuggestions();
     }
   }
 
@@ -234,8 +215,27 @@ class _DictionaryPageState extends State<DictionaryPage> {
                 }
             }, true);
             
-            // 监听图片加载
+            // 阻止词典内部链接跳转
             document.addEventListener('DOMContentLoaded', function() {
+                // 阻止所有链接点击
+                document.addEventListener('click', function(e) {
+                    var target = e.target;
+                    // 向上查找a标签
+                    while (target && target.tagName !== 'A') {
+                        target = target.parentElement;
+                    }
+                    
+                    if (target && target.tagName === 'A') {
+                        var href = target.getAttribute('href');
+                        if (href && (href.startsWith('entry://') || href.startsWith('sound://') || href.startsWith('#'))) {
+                            console.log('阻止词典内部链接跳转: ' + href);
+                            e.preventDefault();
+                            e.stopPropagation();
+                            return false;
+                        }
+                    }
+                }, true);
+                
                 var images = document.querySelectorAll('img');
                 console.log('找到 ' + images.length + ' 个图片元素');
                 images.forEach(function(img, index) {
@@ -537,79 +537,10 @@ class _DictionaryPageState extends State<DictionaryPage> {
                             _selectedDictionary = newDictionary;
                           });
                           _lookupWord();
-                          _loadSuggestions();
                         }
                       },
                     ),
                   ),
-                ],
-              ),
-            ),
-          
-          // 搜索建议区域
-          if (_suggestions.isNotEmpty || _isSuggestionsLoading)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border(
-                  bottom: BorderSide(color: Colors.grey.shade200),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.lightbulb_outline,
-                        size: 20,
-                        color: Theme.of(context).primaryColor,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        '相关建议：',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      if (_isSuggestionsLoading) ...[
-                        const SizedBox(width: 8),
-                        const SizedBox(
-                          width: 12,
-                          height: 12,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ],
-                    ],
-                  ),
-                  
-                  if (_suggestions.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _suggestions.map((suggestion) {
-                        return ActionChip(
-                          label: Text(
-                            suggestion,
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          onPressed: () => _onSuggestionTap(suggestion),
-                          backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                          labelStyle: TextStyle(
-                            color: Theme.of(context).primaryColor,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          side: BorderSide(
-                            color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
                 ],
               ),
             ),
