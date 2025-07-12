@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../../../shared/models/message_model.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_constants.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 class MessageBubble extends StatelessWidget {
@@ -27,7 +25,7 @@ class MessageBubble extends StatelessWidget {
     }
     await _flutterTts.stop(); // 保证状态干净
     await _flutterTts.setLanguage('en-US');
-    await _flutterTts.setSpeechRate(0.35);
+    await _flutterTts.setSpeechRate(0.3);
     await _flutterTts.setVolume(1.0);
     await _flutterTts.setPitch(1.0);
     var isAvailable = await _flutterTts.isLanguageAvailable('en-US');
@@ -36,64 +34,6 @@ class MessageBubble extends StatelessWidget {
     }
   }
 
-  // 弹出菜单并处理操作（改为BottomSheet方式）
-  static void showWordMenu(BuildContext context, String word) async {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (BuildContext ctx) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.volume_up),
-                title: const Text('朗读'),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  await speak(word);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.copy),
-                title: const Text('复制'),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  await Clipboard.setData(ClipboardData(text: word));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('已复制: $word'), duration: Duration(seconds: 1)),
-                  );
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // 富文本处理：将英文单词/短语整体分为可点击span
-  static List<InlineSpan> parseRichContent(String content, BuildContext context, void Function(BuildContext, String) onTap) {
-    final List<InlineSpan> spans = [];
-    final RegExp reg = RegExp(r"([a-zA-Z][a-zA-Z'-]* ?)+|[^a-zA-Z]+", multiLine: true);
-    final matches = reg.allMatches(content);
-    for (final m in matches) {
-      final text = m.group(0)!;
-      if (RegExp(r'^[a-zA-Z]').hasMatch(text.trim())) {
-        spans.add(TextSpan(
-          text: text,
-          style: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
-          recognizer: TapGestureRecognizer()
-            ..onTap = () => onTap(context, text.trim()),
-        ));
-      } else {
-        spans.add(TextSpan(text: text));
-      }
-    }
-    return spans;
-  }
 
   const MessageBubble({
     Key? key,
@@ -126,7 +66,7 @@ class MessageBubble extends StatelessWidget {
     if (isTTSLoading) {
       return Colors.grey.shade400;
     }
-    return null; // 使用默认颜色
+    return Colors.white70; // 使用默认颜色
   }
   
   // TTS按钮是否可用
@@ -148,15 +88,69 @@ class MessageBubble extends StatelessWidget {
     return '播放语音';
   }
 
+  // 构建自定义上下文菜单
+  Widget _buildCustomContextMenu(BuildContext context, EditableTextState editableTextState, String text) {
+    final selection = editableTextState.textEditingValue.selection;
+    final isCollapsed = selection.isCollapsed;
+    
+    return AdaptiveTextSelectionToolbar(
+      anchors: editableTextState.contextMenuAnchors,
+      children: [
+        // 全选
+        if (!isCollapsed || text.isNotEmpty)
+          TextButton(
+            onPressed: () {
+              editableTextState.selectAll(SelectionChangedCause.toolbar);
+            },
+            child: const Text('全选'),
+          ),
+        // 复制
+        if (!isCollapsed)
+          TextButton(
+            onPressed: () {
+              editableTextState.copySelection(SelectionChangedCause.toolbar);
+            },
+            child: const Text('复制'),
+          ),
+        // 朗读（仅在AI消息且有onPlayTTS回调时显示）
+        if (!message.isUser && onPlayTTS != null)
+          TextButton(
+            onPressed: () {
+              // 关闭选择菜单
+              editableTextState.hideToolbar();
+              // 触发朗读
+              onPlayTTS!();
+            },
+            child: const Text('朗读'),
+          ),
+        // 词典功能
+        if (!isCollapsed)
+          TextButton(
+            onPressed: () {
+              // 关闭选择菜单
+              editableTextState.hideToolbar();
+              // 获取选中的文本
+              final selectedText = editableTextState.textEditingValue.selection.textInside(text);
+              _showDictionaryPage(context, selectedText);
+            },
+            child: const Text('词典'),
+          ),
+      ],
+    );
+  }
+
   // 构建临时消息的内容（去除加载动画）
   Widget _buildTemporaryMessageContent(String text, Color textColor) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Flexible(
-          child: Text(
+          child: SelectableText(
             text,
             style: TextStyle(color: textColor, fontSize: 16),
+            contextMenuBuilder: (context, editableTextState) {
+              return _buildCustomContextMenu(context, editableTextState, text);
+            },
           ),
         ),
         // 移除加载动画
@@ -168,7 +162,9 @@ class MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final isMe = message.type == MessageType.user;
     final hasError = message.status == MessageStatus.failed;
-    final bubbleColor = isMe ? Theme.of(context).primaryColor : Colors.grey.shade200;
+    final bubbleColor = isMe 
+        ? Theme.of(context).primaryColor.withValues(alpha: 0.4)
+        : Colors.grey.shade200.withValues(alpha: 0.4);
     final textColor = isMe ? Colors.white : Colors.black87;
     final align = isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final avatar = CircleAvatar(
@@ -211,48 +207,14 @@ class MessageBubble extends StatelessWidget {
                         if (isTemporary)
                           _buildTemporaryMessageContent(message.content, textColor)
                         else
-                          // 用户消息用普通文本，AI消息用富文本
-                          isMe
-                              ? Text(
-                                  message.content,
-                                  style: TextStyle(color: textColor, fontSize: 16),
-                                )
-                              : (
-                                  message.richContent != null
-                                      ? Builder(
-                                          builder: (context) => RichText(
-                                            text: TextSpan(
-                                              children: message.richContent!.map((span) {
-                                                if (span is TextSpan && span.recognizer != null) {
-                                                  // 重新包装recognizer，点击弹出菜单
-                                                  return TextSpan(
-                                                    text: span.text,
-                                                    style: span.style,
-                                                    recognizer: TapGestureRecognizer()
-                                                      ..onTap = () {
-                                                        showWordMenu(context, span.text ?? '');
-                                                      },
-                                                  );
-                                                }
-                                                return span;
-                                              }).toList(),
-                                              style: TextStyle(color: textColor, fontSize: 16),
-                                            ),
-                                          ),
-                                        )
-                                      : Builder(
-                                          builder: (context) => RichText(
-                                            text: TextSpan(
-                                              children: MessageBubble.parseRichContent(
-                                                message.content,
-                                                context,
-                                                showWordMenu,
-                                              ),
-                                              style: TextStyle(color: textColor, fontSize: 16),
-                                            ),
-                                          ),
-                                        )
-                                ),
+                          // 使用SelectableText组件，保留文字选择功能但禁用滚动
+                          SelectableText(
+                            message.content,
+                            style: TextStyle(color: textColor, fontSize: 16),
+                            contextMenuBuilder: (context, editableTextState) {
+                              return _buildCustomContextMenu(context, editableTextState, message.content);
+                            },
+                          ),
                         // 显示错误信息
                         if (hasError && message.hasError) ...[
                           const SizedBox(height: 8),
@@ -309,7 +271,7 @@ class MessageBubble extends StatelessWidget {
                 ),
               if (onCopy != null && !hasError)
                 IconButton(
-                  icon: const Icon(Icons.copy, size: 18),
+                  icon: const Icon(Icons.copy, size: 18,color: Colors.white70,),
                   onPressed: onCopy,
                 ),
               if (hasError && onRetry != null)
@@ -322,5 +284,10 @@ class MessageBubble extends StatelessWidget {
           ),
       ],
     );
+  }
+
+  // 显示词典查询页面
+  void _showDictionaryPage(BuildContext context, String selectedText) {
+    context.push('${AppConstants.dictionaryRoute}?word=${Uri.encodeComponent(selectedText)}');
   }
 }

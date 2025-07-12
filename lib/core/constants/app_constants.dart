@@ -6,8 +6,8 @@ class AppConstants {
   static const String appVersion = '1.0.0';
   
   // API配置
-  static const String baseUrl = 'https://api.classhorse.cn/';
-  // static const String baseUrl = 'http://192.168.8.167:3000/';
+  // static const String baseUrl = 'https://api.classhorse.cn/';
+  static const String baseUrl = 'http://192.168.8.167:3000/';
   static const String apiVersion = 'v1';
   
   // API路径
@@ -24,6 +24,7 @@ class AppConstants {
   static const String difyConversationsPath = '/api/dify/conversations';
   static const String difyTokenUsageHistoryPath = '/api/dify/token-usage-history';
   static const String difyAppsPath = '/api/user/dify-apps';
+  static const String difyWorkflowsRunPath = '/api/dify/workflows/run';
   
   // 主题颜色
   static const Color primaryColor = Color.fromARGB(255, 47, 33, 28);
@@ -37,6 +38,7 @@ class AppConstants {
   static const String forgotPasswordRoute = '/forgot-password';
   static const String homeRoute = '/home';
   static const String chatRoute = '/chat';
+  static const String animatedChatRoute = '/animated-chat';
   static const String profileRoute = '/profile';
   static const String tokenUsageRoute = '/token-usage';
   static const String creditsHistoryRoute = '/credits-history';
@@ -45,6 +47,7 @@ class AppConstants {
   static const String settingsRoute = '/settings';
   static const String voiceSettingsRoute = '/voice-settings';
   static const String blankRoute = '/blank';
+  static const String dictionaryRoute = '/dictionary';
   
   // 存储键名
   static const String tokenKey = 'user_token';
