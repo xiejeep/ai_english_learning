@@ -25,11 +25,23 @@ class _DictionaryPageState extends State<DictionaryPage> {
   // 搜索建议相关
   List<String> _suggestions = [];
   bool _isSuggestionsLoading = false;
+  
+  // 搜索关键词相关
+  late TextEditingController _searchController;
+  String _currentSearchWord = '';
 
   @override
   void initState() {
     super.initState();
+    _currentSearchWord = widget.word;
+    _searchController = TextEditingController(text: widget.word);
     _loadDictionaries();
+  }
+  
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadDictionaries() async {
@@ -56,7 +68,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
   }
 
   Future<void> _lookupWord({String? customWord}) async {
-    final wordToLookup = customWord ?? widget.word;
+    final wordToLookup = customWord ?? _currentSearchWord;
     
     setState(() {
       _isLoading = true;
@@ -128,7 +140,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
 
     try {
       final suggestions = await DictionaryService.instance.getSuggestions(
-        widget.word,
+        _currentSearchWord,
         dictionaryId: _selectedDictionary?.id,
       );
       setState(() {
@@ -144,7 +156,22 @@ class _DictionaryPageState extends State<DictionaryPage> {
   }
 
   void _onSuggestionTap(String suggestion) {
+    setState(() {
+      _currentSearchWord = suggestion;
+      _searchController.text = suggestion;
+    });
     _lookupWord(customWord: suggestion);
+    _loadSuggestions();
+  }
+  
+  void _onSearchSubmitted(String value) {
+    if (value.trim().isNotEmpty && value.trim() != _currentSearchWord) {
+      setState(() {
+        _currentSearchWord = value.trim();
+      });
+      _lookupWord(customWord: value.trim());
+      _loadSuggestions();
+    }
   }
 
   /// 构建支持CSS样式文件的HTML内容
@@ -381,7 +408,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('词典查询: ${widget.word}'),
+        title: const Text('词典查询'),
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
         leading: IconButton(
@@ -399,6 +426,60 @@ class _DictionaryPageState extends State<DictionaryPage> {
       ),
       body: Column(
         children: [
+          // 搜索输入区域
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(
+                bottom: BorderSide(color: Colors.grey.shade200),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.shade100,
+                  blurRadius: 2,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: '输入要查询的单词...',
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: Theme.of(context).primaryColor,
+                ),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+              textInputAction: TextInputAction.search,
+              onSubmitted: _onSearchSubmitted,
+              onChanged: (value) {
+                setState(() {}); // 重建UI以更新清除按钮的显示
+              },
+            ),
+          ),
+          
           // 词典选择区域
           if (!_isDictionariesLoading && _dictionaries.isNotEmpty)
             Container(
