@@ -18,6 +18,9 @@ class HomePage extends ConsumerWidget {
     // 监听认证状态变化，处理登录过期
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (next.isUnauthenticated && next.errorMessage?.contains('登录已过期') == true) {
+        // 清除Dify应用状态，重置为初始状态
+        ref.read(difyAppsProvider.notifier).reset();
+        
         // 显示登录过期提示
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -353,9 +356,9 @@ class HomePage extends ConsumerWidget {
       ),
       child: InkWell(
         onTap: app.enabled ? () {
-          // 检查应用名称，如果是linguabot则跳转到空白页面
+          // 检查应用名称，如果是linguabot则跳转到动画聊天页面
           if (app.name.toLowerCase() == 'linguabot') {
-            context.push('${AppConstants.blankRoute}?appId=${app.id}&appName=${Uri.encodeComponent(app.name)}');
+            context.push('${AppConstants.animatedChatRoute}?appId=${app.id}&appName=${Uri.encodeComponent(app.name)}');
           } else {
             // 跳转到聊天页面，传递应用ID
             context.push('${AppConstants.chatRoute}?appId=${app.id}&appName=${Uri.encodeComponent(app.name)}');

@@ -87,20 +87,6 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                       ),
                     ),
                   ),
-                  // 新建会话按钮
-                  IconButton(
-                    icon: const Icon(Icons.add, color: Colors.white, size: 20),
-                    tooltip: '新建会话',
-                    onPressed: () async {
-                      await ref.read(chatProvider.notifier).createNewConversation();
-                      if (context.mounted) {
-                        Navigator.pop(context); // 关闭抽屉
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('已新建对话')),
-                        );
-                      }
-                    },
-                  ),
                   // 自动朗读按钮
                   Consumer(
                     builder: (context, ref, child) {
@@ -383,42 +369,20 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                   width: double.infinity,
                   child: SafeArea(
                     child: ElevatedButton.icon(
-                      icon: const Icon(Icons.logout, size: 18),
-                      label: const Text('退出登录'),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('新建会话'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Theme.of(context).primaryColor,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       onPressed: () async {
-                        // 先弹出确认对话框
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('确认退出登录'),
-                            content: const Text('确定要退出登录吗？'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(ctx).pop(false),
-                                child: const Text('取消'),
-                              ),
-                              TextButton(
-                                onPressed: () => Navigator.of(ctx).pop(true),
-                                child: const Text('确定'),
-                              ),
-                            ],
-                          ),
-                        );
-                        if (confirm != true) return;
-                        // 调用Provider退出登录
-                        final ref = Navigator.of(context).context.findAncestorStateOfType<ConsumerState>()?.ref;
-                        if (ref != null) {
-                          await ref.read(authProvider.notifier).logout();
-                          if (context.mounted) {
-                            Navigator.of(context).pop(); // 关闭抽屉
-                            // 使用go_router跳转，避免pushReplacementNamed报错
-                            context.go(AppConstants.loginRoute);
-                          }
+                        await ref.read(chatProvider.notifier).createNewConversation();
+                        if (context.mounted) {
+                          Navigator.pop(context); // 关闭抽屉
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('已新建对话')),
+                          );
                         }
                       },
                 ),

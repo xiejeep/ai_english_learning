@@ -2,35 +2,46 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/constants/app_constants.dart';
-import '../../../chat/presentation/providers/chat_provider.dart';
-import '../../../chat/presentation/providers/chat_state.dart';
-import '../widgets/simple_message_bubble.dart';
-import '../../../chat/presentation/widgets/message_input.dart';
-import '../../../chat/presentation/widgets/conversation_drawer.dart';
+import 'package:rive/rive.dart';
+import '../providers/chat_provider.dart';
+import '../providers/chat_state.dart';
+import '../widgets/message_bubble.dart';
+import '../widgets/message_input.dart';
+import '../widgets/conversation_drawer.dart';
 import 'package:easy_refresh/easy_refresh.dart';
+
+import '../../../../core/constants/app_constants.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/providers/auth_state.dart';
 import '../../../../shared/models/message_model.dart';
 
-class BlankPage extends ConsumerStatefulWidget {
+class AnimatedChatPage extends ConsumerStatefulWidget {
   final String? type;
   final String? appId;
   final String? appName;
   
-  const BlankPage({super.key, this.type, this.appId, this.appName});
+  const AnimatedChatPage({super.key, this.type, this.appId, this.appName});
 
   @override
-  ConsumerState<BlankPage> createState() => _BlankPageState();
+  ConsumerState<AnimatedChatPage> createState() => _AnimatedChatPageState();
 }
 
-class _BlankPageState extends ConsumerState<BlankPage> {
+class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  
+  // Rive animation controller
+  Artboard? _riveArtboard;
+  StateMachineController? _controller;
+  
+  // Animation control inputs
+  SMITrigger? _startTrigger;
+  SMITrigger? _stopTrigger;
 
   @override
   void initState() {
     super.initState();
+    _loadRiveAnimation();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeChat();
       FocusScope.of(context).unfocus();
@@ -41,7 +52,29 @@ class _BlankPageState extends ConsumerState<BlankPage> {
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _controller?.dispose();
     super.dispose();
+  }
+
+  void _loadRiveAnimation() {
+    rootBundle.load('assets/rive/monnalisha.riv').then((data) async {
+      final file = RiveFile.import(data);
+      final artboard = file.mainArtboard;
+      final controller = StateMachineController.fromArtboard(artboard, 'State Machine 1');
+      
+      if (controller != null) {
+        artboard.addController(controller);
+        
+        // 获取动画输入控制器
+        _startTrigger = controller.findSMI('start') as SMITrigger?;
+        _stopTrigger = controller.findSMI('stop') as SMITrigger?;
+        
+        setState(() {
+          _riveArtboard = artboard;
+          _controller = controller;
+        });
+      }
+    });
   }
 
   void _initializeChat() async {
@@ -49,6 +82,19 @@ class _BlankPageState extends ConsumerState<BlankPage> {
       ref.read(chatProvider.notifier).setAppInfo(widget.appId, widget.appName);
     }
     await ref.read(chatProvider.notifier).initializeChat();
+  }
+
+
+
+
+
+
+  void _onStreamingStarted() {
+    
+  }
+
+  void _onStreamingEnded() {
+    
   }
 
   PreferredSizeWidget _buildAppBar() {
@@ -72,7 +118,7 @@ class _BlankPageState extends ConsumerState<BlankPage> {
                   currentConversation.displayName,
                   style: TextStyle(
                     fontSize: 16,
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -87,19 +133,12 @@ class _BlankPageState extends ConsumerState<BlankPage> {
       actions: [
         Builder(
           builder: (context) => IconButton(
-            icon: const Icon(Icons.chat_bubble_outline),
+            icon: const Icon(Icons.menu),
             tooltip: '会话列表',
             onPressed: () {
               Scaffold.of(context).openDrawer();
             },
           ),
-        ),
-        IconButton(
-          icon: const Icon(Icons.person_outline),
-          tooltip: '个人中心',
-          onPressed: () {
-            context.push(AppConstants.profileRoute);
-          },
         ),
       ],
     );
@@ -117,47 +156,93 @@ class _BlankPageState extends ConsumerState<BlankPage> {
             duration: const Duration(seconds: 2),
           ),
         );
-        
         context.go(AppConstants.loginRoute);
+      }
+    });
+
+    // 监听聊天状态变化来触发动画
+    ref.listen(chatProvider, (previous, next) {
+      // 监听流式响应状态变化
+      if (previous != null) {
+        // 流式响应开始
+        if (!previous.isStreaming && next.isStreaming) {
+          _onStreamingStarted();
+        }
+        // 流式响应结束
+        if (previous.isStreaming && !next.isStreaming) {
+          _onStreamingEnded();
+        }
+        
+        // 监听TTS播放状态变化
+        if (!previous.isTTSPlaying && next.isTTSPlaying) {
+          // TTS开始播放，触发开始动画
+          _startTrigger?.fire();
+        }
+        
+        if (previous.isTTSPlaying && !next.isTTSPlaying) {
+          // TTS停止播放，触发停止动画
+          _stopTrigger?.fire();
+        }
+        
+        if (previous.status != ChatStatus.success && 
+            next.status == ChatStatus.success && 
+            next.messages.isNotEmpty) {
+        }
       }
     });
 
     return Scaffold(
       appBar: _buildAppBar(),
       drawer: const ConversationDrawer(),
-      body: GestureDetector(
-        onTap: () {
-          FocusScope.of(context).unfocus();
-        },
-        child: Consumer(
-          builder: (context, ref, child) {
-            final chatState = ref.watch(chatProvider);
+      body: Stack(
+        children: [
+          // Rive animation background
+          if (_riveArtboard != null)
+            Positioned.fill(
+              child: Rive(
+                artboard: _riveArtboard!,
+                fit: BoxFit.cover,
+              ),
+            ),
+          
+          // Chat content overlay
+          Positioned.fill(
+            child: Container(
+              decoration:const BoxDecoration(
+                color: Colors.transparent,
+              ),
+              child: GestureDetector(
+                onTap: () {
+                  FocusScope.of(context).unfocus();
+                },
+                child: Consumer(
+                  builder: (context, ref, child) {
+                    final chatState = ref.watch(chatProvider);
 
-            if (chatState.status == ChatStatus.loading) {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
-            }
-
-            if (chatState.status == ChatStatus.error) {
-              return _buildErrorWidget(chatState.error ?? '未知错误');
-            }
-
-            return Column(
-              children: [
-                Expanded(
-                  child: _buildMessagesList(chatState),
+                    return Column(
+                      children: [
+                        Expanded(
+                          child: _buildMessagesList(chatState),
+                        ),
+                        _buildMessageInput(chatState),
+                      ],
+                    );
+                  },
                 ),
-                _buildMessageInput(chatState),
-              ],
-            );
-          },
-        ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildMessagesList(ChatState state) {
+    // 处理错误状态
+    if (state.status == ChatStatus.error) {
+      return _buildErrorWidget(state.error ?? '未知错误');
+    }
+    
     if (state.status == ChatStatus.loading && state.messages.isEmpty) {
       return Center(
         child: Column(
@@ -193,7 +278,7 @@ class _BlankPageState extends ConsumerState<BlankPage> {
       child: ListView.builder(
         controller: _scrollController,
         reverse: true,
-        padding: const EdgeInsets.symmetric(horizontal: 8,vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         itemCount: state.messages.length,
         itemBuilder: (context, index) {
           final reversedIndex = state.messages.length - 1 - index;
@@ -204,7 +289,7 @@ class _BlankPageState extends ConsumerState<BlankPage> {
                   state.isStreaming && msg == state.messages.last);
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: SimpleMessageBubble(
+            child: MessageBubble(
               message: msg,
               isTemporary: isTemporary,
               onPlayTTS: msg.isAI
@@ -243,25 +328,21 @@ class _BlankPageState extends ConsumerState<BlankPage> {
                   margin: const EdgeInsets.symmetric(horizontal: 24),
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor.withOpacity(0.05),
+                    color: Theme.of(context).primaryColor.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: Theme.of(context).primaryColor.withOpacity(0.2),
+                      color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
                       width: 1,
                     ),
                   ),
-                  child: Column(
-                    children: [
-                      Text(
-                        currentConversation!.introduction!,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey.shade700,
-                          height: 1.4,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+                  child: Text(
+                    currentConversation!.introduction!,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey.shade700,
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -322,8 +403,8 @@ class _BlankPageState extends ConsumerState<BlankPage> {
                 _messageController.text = prompt;
                 _sendMessage();
               },
-              backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-              labelStyle:  TextStyle(
+              backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+              labelStyle: TextStyle(
                 color: Theme.of(context).primaryColor,
                 fontWeight: FontWeight.w500,
               ),

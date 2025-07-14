@@ -10,8 +10,6 @@ import '../../domain/entities/conversation.dart';
 import 'chat_state.dart';
 import '../../../../core/storage/storage_service.dart';
 import '../../../../core/services/tts_cache_service.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart';
 import '../../../auth/presentation/providers/user_profile_provider.dart';
 
 // 聊天相关的Provider
@@ -129,31 +127,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
     print('✅ 设置应用信息: appId=$appId, appName=$appName');
   }
 
-  // 富文本处理：将英文单词/短语整体分为可点击span
-  static List<InlineSpan> parseRichContent(String content, void Function(BuildContext, String) onTap, [BuildContext? context]) {
-    final List<InlineSpan> spans = [];
-    final RegExp reg = RegExp(r"([a-zA-Z][a-zA-Z'-]* ?)+|[^a-zA-Z]+", multiLine: true);
-    final matches = reg.allMatches(content);
-    for (final m in matches) {
-      final text = m.group(0)!;
-      if (RegExp(r'^[a-zA-Z]').hasMatch(text.trim())) {
-        spans.add(TextSpan(
-          text: text,
-          style: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
-          recognizer: TapGestureRecognizer()
-            ..onTap = () {
-              if (context != null) {
-                onTap(context, text.trim());
-              }
-            },
-        ));
-      } else {
-        spans.add(TextSpan(text: text));
-      }
-    }
-    return spans;
-  }
-
   // 创建新会话（不预先生成ID，等待Dify返回）
   Future<void> createNewConversation() async {
     try {
@@ -209,16 +182,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
           ? _extractOriginalMessageId(messages.first.id) 
           : null;
       
-      // 富文本处理
-      final processedMessages = messages.map((msg) =>
-        msg.isAI ? msg.copyWith(richContent: parseRichContent(msg.content, (context, word) {
-          print('点击了单词: ' + word);
-        }, null)) : msg
-      ).toList();
-      
       state = state.copyWith(
         currentConversation: conversation,
-        messages: processedMessages,
+        messages: messages,
         status: ChatStatus.success,
         firstId: firstId,
         hasMoreMessages: hasMore,
@@ -259,16 +225,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
             ? _extractOriginalMessageId(messages.first.id) 
             : null;
         
-        // 富文本处理
-        final processedMessages = messages.map((msg) =>
-          msg.isAI ? msg.copyWith(richContent: parseRichContent(msg.content, (context, word) {
-            print('点击了单词: ' + word);
-          }, null)) : msg
-        ).toList();
-        
         state = state.copyWith(
           currentConversation: latestConversation,
-          messages: processedMessages,
+          messages: messages,
           status: ChatStatus.success,
           firstId: firstId,
           hasMoreMessages: hasMore,
@@ -323,13 +282,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       print('📊 API返回hasMore: $hasMore');
       
       if (newMessages.isNotEmpty) {
-        // 富文本处理
-        final processedNewMessages = newMessages.map((msg) =>
-          msg.isAI ? msg.copyWith(richContent: parseRichContent(msg.content, (context, word) {
-            print('点击了单词: ' + word);
-          }, null)) : msg
-        ).toList();
-        final updatedMessages = [...processedNewMessages, ...state.messages];
+        final updatedMessages = [...newMessages, ...state.messages];
         
         // 更新游标为最早的消息ID
         final newFirstId = newMessages.isNotEmpty 
@@ -496,10 +449,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
               return msg.copyWith(
                 content: fullResponse,
                 status: MessageStatus.received,
-                richContent: parseRichContent(fullResponse, (context, word) {
-                  // TODO: 这里可以弹窗或跳转单词详情
-                  print('点击了单词: ' + word);
-                }, null),
               );
             }
             return msg;
@@ -695,10 +644,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
               return msg.copyWith(
                 content: fullResponse,
                 status: MessageStatus.received,
-                richContent: parseRichContent(fullResponse, (context, word) {
-                  // TODO: 这里可以弹窗或跳转单词详情
-                  print('点击了单词: ' + word);
-                }, null),
               );
             }
             return msg;

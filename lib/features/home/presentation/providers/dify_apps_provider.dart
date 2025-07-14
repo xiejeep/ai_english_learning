@@ -127,6 +127,11 @@ class DifyAppsNotifier extends StateNotifier<DifyAppsState> {
       state = state.copyWith(errorMessage: null);
     }
   }
+
+  // 重置状态到初始状态
+  void reset() {
+    state = const DifyAppsState();
+  }
 }
 
 // Dify应用状态提供者
