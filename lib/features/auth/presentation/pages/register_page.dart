@@ -17,7 +17,6 @@ class RegisterPage extends ConsumerStatefulWidget {
 
 class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -27,12 +26,19 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   @override
   void dispose() {
-    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _codeController.dispose();
     super.dispose();
+  }
+
+  /// 从邮箱地址提取用户名前缀
+  String _extractUsernameFromEmail(String email) {
+    if (email.isEmpty || !email.contains('@')) {
+      return '';
+    }
+    return email.split('@')[0];
   }
 
   @override
@@ -68,21 +74,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               children: [
                 _buildHeader(),
                 const SizedBox(height: 32),
-                
-                AuthInputField(
-                  controller: _usernameController,
-                  label: '用户名',
-                  hintText: '3-20位，字母、数字或下划线',
-                  prefixIcon: Icons.person_outline,
-                  onChanged: registerFormNotifier.updateUsername,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return '请输入用户名';
-                    if (!registerFormState.isUsernameValid) return '用户名格式不正确';
-                    return null;
-                  },
-                ),
-                
-                const SizedBox(height: 16),
                 
                 AuthInputField(
                   controller: _emailController,
@@ -281,8 +272,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       return;
     }
     
+    // 从邮箱提取用户名前缀
+    final username = _extractUsernameFromEmail(_emailController.text.trim());
+    
     final request = RegisterRequest(
-      username: _usernameController.text,
+      username: username,
       email: _emailController.text,
       password: _passwordController.text,
       code: _codeController.text,

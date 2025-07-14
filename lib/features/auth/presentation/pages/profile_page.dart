@@ -196,7 +196,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               if (shouldLogout == true) {
                 await ref.read(authProvider.notifier).logout();
                 if (context.mounted) {
-                  Navigator.of(context).pushReplacementNamed(AppConstants.loginRoute);
+                  context.go(AppConstants.loginRoute);
                 }
               }
             },
@@ -242,16 +242,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     loading: () => Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Row(
+                        const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.info_outline, color: Colors.grey, size: 20),
-                            const SizedBox(width: 4),
+                            SizedBox(width: 4),
                             Text('签到', style: TextStyle(fontSize: 14, color: Colors.grey)),
                           ],
                         ),
                         const SizedBox(height: 4),
-                        Text('连续：--天', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                        const Text('连续：--天', style: TextStyle(fontSize: 12, color: Colors.grey)),
                         const SizedBox(height: 8),
                         ElevatedButton(
                           onPressed: null, // 加载中时禁用
@@ -275,12 +275,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     error: (e, _) => Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Row(
+                        const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.error, color: Colors.red, size: 20),
-                            const SizedBox(width: 4),
-                            Text('加载失败', style: const TextStyle(fontSize: 12, color: Colors.red)),
+                            Icon(Icons.error, color: Colors.red, size: 20),
+                            SizedBox(width: 4),
+                            Text('加载失败', style: TextStyle(fontSize: 12, color: Colors.red)),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -350,24 +350,31 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               ),
               child: ListTile(
                 title: const Text('积分'),
-                trailing: creditsAsync.when(
-                  loading: () => Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('--', style: TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 8),
-                      const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                    ],
-                  ),
-                  error: (e, _) => Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('--', style: TextStyle(fontSize: 16, color: Colors.red, fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 4),
-                      Icon(Icons.refresh, size: 16, color: Colors.red),
-                    ],
-                  ),
-                  data: (credits) => Text('$credits', style: TextStyle(fontSize: 16, color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold)),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    creditsAsync.when(
+                      loading: () => const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('--', style: TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.bold)),
+                          SizedBox(width: 8),
+                          SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                        ],
+                      ),
+                      error: (e, _) => const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('--', style: TextStyle(fontSize: 16, color: Colors.red, fontWeight: FontWeight.bold)),
+                          SizedBox(width: 4),
+                          Icon(Icons.refresh, size: 16, color: Colors.red),
+                        ],
+                      ),
+                      data: (credits) => Text('$credits', style: TextStyle(fontSize: 16, color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.arrow_forward_ios, size: 16),
+                  ],
                 ),
                 onTap: () {
                   context.push(AppConstants.creditsHistoryRoute);
@@ -386,24 +393,31 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               ),
               child: ListTile(
                 title: const Text('Token'),
-                trailing: tokenAsync.when(
-                  loading: () => Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('--', style: TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 8),
-                      const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                    ],
-                  ),
-                  error: (e, _) => Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('--', style: TextStyle(fontSize: 16, color: Colors.red, fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 4),
-                      Icon(Icons.refresh, size: 16, color: Colors.red),
-                    ],
-                  ),
-                  data: (token) => Text('$token', style: TextStyle(fontSize: 16, color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold)),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    tokenAsync.when(
+                      loading: () => const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('--', style: TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.bold)),
+                          SizedBox(width: 8),
+                          SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                        ],
+                      ),
+                      error: (e, _) => const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('--', style: TextStyle(fontSize: 16, color: Colors.red, fontWeight: FontWeight.bold)),
+                          SizedBox(width: 4),
+                          Icon(Icons.refresh, size: 16, color: Colors.red),
+                        ],
+                      ),
+                      data: (token) => Text('$token', style: TextStyle(fontSize: 16, color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.arrow_forward_ios, size: 16),
+                  ],
                 ),
                 onTap: () {
                   context.push(AppConstants.tokenUsageRoute);
@@ -421,9 +435,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: ListTile(
-                leading: Icon(Icons.settings, color: Theme.of(context).primaryColor),
                 title: const Text('设置'),
-                subtitle: const Text('应用设置和偏好配置'),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                 onTap: () {
                   context.push(AppConstants.settingsRoute);

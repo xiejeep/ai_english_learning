@@ -323,16 +323,7 @@ class RegisterFormNotifier extends StateNotifier<RegisterFormState> {
     super.dispose();
   }
 
-  // 更新用户名
-  void updateUsername(String username) {
-    final isValid = _validateUsername(username);
-    state = state.copyWith(
-      username: username,
-      isUsernameValid: isValid,
-      isFormValid: _isFormValid(),
-      errorMessage: null,
-    );
-  }
+
 
   // 更新邮箱
   void updateEmail(String email) {
@@ -453,12 +444,7 @@ class RegisterFormNotifier extends StateNotifier<RegisterFormState> {
     state = const RegisterFormState();
   }
 
-  // 验证用户名
-  bool _validateUsername(String username) {
-    return username.length >= 3 && 
-           username.length <= 20 && 
-           RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(username);
-  }
+
 
   // 验证邮箱
   bool _validateEmail(String email) {
@@ -473,9 +459,9 @@ class RegisterFormNotifier extends StateNotifier<RegisterFormState> {
 
   // 检查表单是否有效
   bool _isFormValid() {
-    return state.isUsernameValid &&
-           state.isEmailValid &&
+    return state.isEmailValid &&
            state.isPasswordValid &&
+           state.isPasswordMatching &&
            state.isVerificationCodeValid;
   }
 }

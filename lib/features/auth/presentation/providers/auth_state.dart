@@ -149,13 +149,11 @@ class LoginFormState {
 
 // 注册表单状态
 class RegisterFormState {
-  final String username;
   final String email;
   final String phone;
   final String password;
   final String confirmPassword;
   final String verificationCode;
-  final bool isUsernameValid;
   final bool isEmailValid;
   final bool isPasswordValid;
   final bool isPasswordMatching;
@@ -168,13 +166,11 @@ class RegisterFormState {
   final String? errorMessage;
 
   const RegisterFormState({
-    this.username = '',
     this.email = '',
     this.phone = '',
     this.password = '',
     this.confirmPassword = '',
     this.verificationCode = '',
-    this.isUsernameValid = false,
     this.isEmailValid = false,
     this.isPasswordValid = false,
     this.isPasswordMatching = false,
@@ -188,13 +184,11 @@ class RegisterFormState {
   });
 
   RegisterFormState copyWith({
-    String? username,
     String? email,
     String? phone,
     String? password,
     String? confirmPassword,
     String? verificationCode,
-    bool? isUsernameValid,
     bool? isEmailValid,
     bool? isPasswordValid,
     bool? isPasswordMatching,
@@ -208,13 +202,11 @@ class RegisterFormState {
     bool clearErrorMessage = false,
   }) {
     return RegisterFormState(
-      username: username ?? this.username,
       email: email ?? this.email,
       phone: phone ?? this.phone,
       password: password ?? this.password,
       confirmPassword: confirmPassword ?? this.confirmPassword,
       verificationCode: verificationCode ?? this.verificationCode,
-      isUsernameValid: isUsernameValid ?? this.isUsernameValid,
       isEmailValid: isEmailValid ?? this.isEmailValid,
       isPasswordValid: isPasswordValid ?? this.isPasswordValid,
       isPasswordMatching: isPasswordMatching ?? this.isPasswordMatching,
@@ -230,6 +222,6 @@ class RegisterFormState {
 
   @override
   String toString() {
-    return 'RegisterFormState(username: $username, email: $email, phone: $phone, password: [HIDDEN], confirmPassword: [HIDDEN], verificationCode: $verificationCode, isUsernameValid: $isUsernameValid, isEmailValid: $isEmailValid, isPasswordValid: $isPasswordValid, isPasswordMatching: $isPasswordMatching, isVerificationCodeValid: $isVerificationCodeValid, isFormValid: $isFormValid, isLoading: $isLoading, isSendingCode: $isSendingCode, isCodeSentSuccessfully: $isCodeSentSuccessfully, codeCooldownSeconds: $codeCooldownSeconds, errorMessage: $errorMessage)';
+    return 'RegisterFormState(email: $email, phone: $phone, password: [HIDDEN], confirmPassword: [HIDDEN], verificationCode: $verificationCode, isEmailValid: $isEmailValid, isPasswordValid: $isPasswordValid, isPasswordMatching: $isPasswordMatching, isVerificationCodeValid: $isVerificationCodeValid, isFormValid: $isFormValid, isLoading: $isLoading, isSendingCode: $isSendingCode, isCodeSentSuccessfully: $isCodeSentSuccessfully, codeCooldownSeconds: $codeCooldownSeconds, errorMessage: $errorMessage)';
   }
 }
