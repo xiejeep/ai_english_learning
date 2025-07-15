@@ -46,12 +46,33 @@ class TTSEventHandler {
     }
   }
 
+  /// 设置消息文本（用于缓存）
+  void setMessageText(String serverMessageId, String messageText, MessageIdMappingService mappingService) {
+    try {
+      final localMessageId = mappingService.getLocalId(serverMessageId);
+      if (localMessageId != null) {
+        print('📝 [TTS Event] 设置消息文本: $serverMessageId -> $localMessageId');
+        print('📝 [TTS Event] 消息文本长度: ${messageText.length}');
+        print('📝 [TTS Event] 消息文本预览: ${messageText.length > 50 ? messageText.substring(0, 50) + '...' : messageText}');
+        
+        // 使用localMessageId设置消息文本到StreamTTSService
+        StreamTTSService.instance.setMessageText(localMessageId, messageText);
+      } else {
+        print('⚠️ [TTS Event] 设置消息文本失败，未找到本地消息ID映射: $serverMessageId');
+      }
+    } catch (e) {
+      print('❌ [TTS Event] 设置消息文本失败: $e');
+    }
+  }
+
   /// 处理TTS消息开始事件
   void handleTTSStart(String serverMessageId, MessageIdMappingService mappingService) {
     try {
       final localMessageId = mappingService.getLocalId(serverMessageId);
       if (localMessageId != null) {
         print('🎬 [TTS Event] 开始处理TTS消息: $serverMessageId -> $localMessageId');
+        
+        // 调用StreamTTSService.startTTSMessage（消息文本应该已经设置过了）
         StreamTTSService.instance.startTTSMessage(localMessageId);
       } else {
         print('⚠️ [TTS Event] 未找到本地消息ID映射: $serverMessageId');
@@ -86,11 +107,18 @@ class TTSEventHandler {
   /// 处理TTS消息结束事件
   Future<void> handleTTSMessageEnd(String serverMessageId, MessageIdMappingService mappingService) async {
     try {
+      print('🏁 [TTS Event] 接收到TTS消息结束事件');
+      print('🔍 [TTS Event] 服务器消息ID: $serverMessageId');
+      
       final localMessageId = mappingService.getLocalId(serverMessageId);
+      print('🔍 [TTS Event] 本地消息ID: $localMessageId');
+      
       if (localMessageId != null) {
-        print('🏁 [TTS Event] 处理TTS消息结束: $serverMessageId -> $localMessageId');
+        print('✅ [TTS Event] 调用StreamTTSService.finishTTSMessage: $localMessageId');
         await StreamTTSService.instance.finishTTSMessage(localMessageId);
+        print('🏁 [TTS Event] 处理TTS消息结束: $serverMessageId -> $localMessageId');
       } else {
+        print('❌ [TTS Event] 本地消息ID为空，无法完成TTS消息处理');
         print('⚠️ [TTS Event] 未找到本地消息ID映射: $serverMessageId');
       }
     } catch (e) {

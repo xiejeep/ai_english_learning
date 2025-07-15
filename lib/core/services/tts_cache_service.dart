@@ -30,17 +30,40 @@ class TTSCacheService {
   /// 初始化缓存服务
   Future<void> initialize() async {
     try {
+      print('🔄 开始初始化TTS缓存服务...');
+      
       // 获取应用文档目录
       final appDir = await getApplicationDocumentsDirectory();
+      print('📁 应用文档目录: ${appDir.path}');
+      
+      // 验证应用目录可访问性
+      if (!await appDir.exists()) {
+        throw Exception('应用文档目录不存在: ${appDir.path}');
+      }
       
       // 创建TTS缓存目录
       _cacheDir = Directory(path.join(appDir.path, 'tts_cache'));
+      print('📁 缓存目录路径: ${_cacheDir!.path}');
+      
       if (!await _cacheDir!.exists()) {
+        print('📁 创建缓存目录...');
         await _cacheDir!.create(recursive: true);
+        
+        // 验证目录创建成功
+        if (!await _cacheDir!.exists()) {
+          throw Exception('缓存目录创建失败: ${_cacheDir!.path}');
+        }
+        print('✅ 缓存目录创建成功');
+      } else {
+        print('✅ 缓存目录已存在');
       }
+      
+      // 测试目录权限
+      await _testDirectoryPermissions();
       
       // 初始化索引文件
       _indexFile = File(path.join(_cacheDir!.path, 'cache_index.json'));
+      print('📄 索引文件路径: ${_indexFile!.path}');
       
       // 加载现有的缓存索引
       await _loadCacheIndex();
@@ -48,10 +71,84 @@ class TTSCacheService {
       // 清理过期或无效的缓存
       await _cleanupCache();
       
-      print('✅ TTS缓存服务初始化完成，缓存目录: ${_cacheDir!.path}');
-      print('📊 当前缓存文件数量: ${_cacheIndex.length}');
-    } catch (e) {
+      // 获取最终统计信息
+      final stats = await getCacheStats();
+      
+      print('✅ TTS缓存服务初始化完成');
+      print('📊 缓存目录: ${_cacheDir!.path}');
+      print('📊 缓存文件数量: ${stats['fileCount']}');
+      print('📊 缓存总大小: ${stats['totalSizeMB'].toStringAsFixed(2)} MB');
+      print('📊 最大文件数: $maxCacheFiles');
+      print('📊 最大大小: $maxCacheSizeMB MB');
+      
+    } catch (e, stackTrace) {
       print('❌ TTS缓存服务初始化失败: $e');
+      print('📍 错误堆栈: $stackTrace');
+      
+      // 尝试基本的错误恢复
+      try {
+        await _attemptErrorRecovery();
+      } catch (recoveryError) {
+        print('❌ 错误恢复失败: $recoveryError');
+      }
+      
+      rethrow;
+    }
+  }
+  
+  /// 测试目录权限
+  Future<void> _testDirectoryPermissions() async {
+    try {
+      final testFile = File(path.join(_cacheDir!.path, 'permission_test.tmp'));
+      
+      // 测试写入
+      await testFile.writeAsString('test');
+      print('✅ 缓存目录写入权限正常');
+      
+      // 测试读取
+      final content = await testFile.readAsString();
+      if (content != 'test') {
+        throw Exception('读取测试失败');
+      }
+      print('✅ 缓存目录读取权限正常');
+      
+      // 测试删除
+      await testFile.delete();
+      print('✅ 缓存目录删除权限正常');
+      
+    } catch (e) {
+      throw Exception('缓存目录权限测试失败: $e');
+    }
+  }
+  
+  /// 尝试错误恢复
+  Future<void> _attemptErrorRecovery() async {
+    print('🔧 尝试错误恢复...');
+    
+    try {
+      // 重置内部状态
+      _cacheIndex.clear();
+      _cacheDir = null;
+      _indexFile = null;
+      
+      // 尝试重新获取应用目录
+      final appDir = await getApplicationDocumentsDirectory();
+      _cacheDir = Directory(path.join(appDir.path, 'tts_cache'));
+      
+      // 强制创建目录
+      if (await _cacheDir!.exists()) {
+        await _cacheDir!.delete(recursive: true);
+      }
+      await _cacheDir!.create(recursive: true);
+      
+      // 创建新的索引文件
+      _indexFile = File(path.join(_cacheDir!.path, 'cache_index.json'));
+      await _indexFile!.writeAsString('{}');
+      
+      print('✅ 错误恢复成功');
+    } catch (e) {
+      print('❌ 错误恢复失败: $e');
+      rethrow;
     }
   }
   

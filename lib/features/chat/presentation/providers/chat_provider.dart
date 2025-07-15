@@ -440,12 +440,21 @@ class ChatNotifier extends StateNotifier<ChatState> {
               await _ttsEventHandler.handleTTSMessageEnd(originalMessageId, _messageIdMappingService);
             }
           } else if (event == 'message_end') {
-            // 处理消息结束事件，获取message_id用于TTS
+            // 处理消息结束事件，获取message_id用于TTS，并设置完整的消息文本
             final messageId = data['message_id'] as String?;
             if (messageId != null) {
               // 使用原始消息ID（去掉_ai后缀）进行映射
               final originalMessageId = _extractOriginalMessageId(messageId);
               _messageIdMappingService.ensureMapping(originalMessageId, tempAiMessage.id);
+              
+              // 设置完整的消息文本到TTS服务（用于缓存）
+              final messageText = fullResponse.isNotEmpty ? fullResponse : tempAiMessage.content;
+              print('📝 [Chat Provider] 消息结束，设置消息文本: $originalMessageId');
+              print('📝 [Chat Provider] 消息文本长度: ${messageText.length}');
+              print('📝 [Chat Provider] 消息文本预览: ${messageText.length > 50 ? messageText.substring(0, 50) + '...' : messageText}');
+              
+              // 设置消息文本到TTS事件处理器
+              _ttsEventHandler.setMessageText(originalMessageId, messageText, _messageIdMappingService);
             }
           }
         },
@@ -643,6 +652,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
     try {
       print('🔊 [STREAM TTS] 开始播放消息音频: $messageId');
       
+      // 查找对应的消息
+      final message = state.messages.firstWhere(
+        (msg) => msg.id == messageId,
+        orElse: () => throw Exception('未找到消息: $messageId'),
+      );
+      
+      print('📝 [STREAM TTS] 消息内容: ${message.content.substring(0, message.content.length > 50 ? 50 : message.content.length)}...');
+      
       // 设置加载状态
       state = state.copyWith(
         isTTSLoading: true,
@@ -656,40 +673,19 @@ class ChatNotifier extends StateNotifier<ChatState> {
         await StreamTTSService.instance.initialize();
       }
       
-      // 直接使用本地消息ID播放音频文件
-      // 因为音频文件是用本地消息ID保存的
-      await StreamTTSService.instance.playMessageAudio(messageId);
-      print('🎯 [STREAM TTS] 使用本地消息ID播放: $messageId');
+      // 使用消息内容播放音频（缓存是基于内容的）
+      await StreamTTSService.instance.playMessageAudioByContent(message.content);
+      print('🎯 [STREAM TTS] 使用消息内容播放: $messageId');
       
       print('🎯 [STREAM TTS] 消息音频播放启动成功');
     } catch (e) {
       print('❌ [STREAM TTS] 播放TTS失败: $e');
       
-      // 如果直接播放失败，尝试查找服务器消息ID
-      try {
-        final serverMessageId = _messageIdMappingService.getServerMessageId(messageId);
-        
-        if (serverMessageId != null) {
-          print('🔄 [STREAM TTS] 尝试使用服务器消息ID播放: $serverMessageId');
-          await StreamTTSService.instance.playMessageAudio(serverMessageId);
-          print('🎯 [STREAM TTS] 服务器消息ID播放成功');
-          return;
-        }
-        
-        // 最后尝试使用原始消息ID（去掉_ai后缀）
-        final originalMessageId = _extractOriginalMessageId(messageId);
-        print('🔄 [STREAM TTS] 尝试使用原始消息ID: $originalMessageId');
-        await StreamTTSService.instance.playMessageAudio(originalMessageId);
-        print('🎯 [STREAM TTS] 原始消息ID播放成功');
-      } catch (fallbackError) {
-        print('❌ [STREAM TTS] 所有播放尝试都失败: $fallbackError');
-        
-        // 立即清除所有TTS状态
-        state = state.copyWith(
-          isTTSLoading: false,
-          isTTSPlaying: false,
-        );
-      }
+      // 立即清除所有TTS状态
+      state = state.copyWith(
+        isTTSLoading: false,
+        isTTSPlaying: false,
+      );
     }
   }
 

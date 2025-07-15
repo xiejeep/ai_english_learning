@@ -89,6 +89,17 @@ class StreamTTSService {
     _onError = onError;
   }
   
+  /// 设置消息文本（用于缓存）
+  void setMessageText(String messageId, String messageText) {
+    print('📝 [StreamTTS] 设置消息文本: $messageId');
+    print('📝 [StreamTTS] 消息文本长度: ${messageText.length}');
+    print('📝 [StreamTTS] 消息文本预览: ${messageText.length > 50 ? messageText.substring(0, 50) + '...' : messageText}');
+    
+    // 设置消息文本到播放列表服务
+    _playlistService.setMessageText(messageId, messageText);
+    print('✅ [StreamTTS] 消息文本已设置到播放列表服务');
+  }
+
   /// 开始处理新的TTS消息
   void startTTSMessage(String messageId) {
     print('🎵 [StreamTTS] 开始处理TTS消息: $messageId');
@@ -123,22 +134,29 @@ class StreamTTSService {
   
   /// 完成TTS消息处理并播放音频
   Future<void> finishTTSMessage(String messageId) async {
+    print('🏁 [StreamTTS] 接收到完成TTS消息请求: $messageId');
+    print('🔍 [StreamTTS] 当前处理的消息ID: $_currentMessageId');
+    
     if (_currentMessageId != messageId) {
-      print('⚠️ [StreamTTS] 完成消息ID不匹配，忽略');
+      print('⚠️ [StreamTTS] 完成消息ID不匹配，忽略: 期望=$_currentMessageId, 实际=$messageId');
       return;
     }
     
     try {
-      print('✅ [StreamTTS] 完成TTS消息: $messageId');
+      print('✅ [StreamTTS] 开始完成TTS消息: $messageId');
       
       // 使用播放列表服务完成消息处理
+      print('📞 [StreamTTS] 调用PlaylistTTSService.finishTTSMessage');
       await _playlistService.finishTTSMessage(messageId);
+      print('✅ [StreamTTS] PlaylistTTSService.finishTTSMessage 调用完成');
       
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('❌ [StreamTTS] 完成TTS消息失败: $e');
+      print('📍 [StreamTTS] 错误堆栈: $stackTrace');
       _onError?.call('完成TTS消息失败: $e');
     } finally {
       // 清理状态
+      print('🧹 [StreamTTS] 清理状态，重置当前消息ID');
       _currentMessageId = null;
     }
   }
@@ -157,6 +175,21 @@ class StreamTTSService {
     try {
       // 使用播放列表服务播放缓存音频
       await _playlistService.playMessageAudio(messageId);
+    } catch (e) {
+      print('❌ [StreamTTS] 播放缓存音频失败: $e');
+      _onError?.call('播放失败: $e');
+    }
+  }
+  
+  /// 根据消息内容播放缓存音频（新方法）
+  Future<void> playMessageAudioByContent(String messageContent) async {
+    if (!_isInitialized) {
+      await initialize();
+    }
+    
+    try {
+      // 使用播放列表服务播放缓存音频（传入消息内容）
+      await _playlistService.playMessageAudio(messageContent);
     } catch (e) {
       print('❌ [StreamTTS] 播放缓存音频失败: $e');
       _onError?.call('播放失败: $e');
