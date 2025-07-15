@@ -22,10 +22,10 @@ class ChatRemoteDataSource {
     required String userId,
     String? appId,
   }) async* {
-    await for (final data in sendMessageStreamWithConversationId(
+    await for (final data in sendMessageStreamWithConversationIdAndType(
       message: message,
       conversationId: conversationId,
-      userId: userId,
+      type: null,
       appId: appId,
     )) {
       final content = data['content'] as String?;
@@ -35,41 +35,23 @@ class ChatRemoteDataSource {
     }
   }
 
-  // 改进的流式响应，返回包含消息内容和会话ID的数据
-  Stream<Map<String, dynamic>> sendMessageStreamWithConversationId({
-    required String message,
-    required String conversationId,
-    required String userId,
-    String? appId,
-  }) async* {
-    await for (final data in sendMessageStreamWithConversationIdAndType(
-      message: message,
-      conversationId: conversationId,
-      userId: userId,
-      type: '',
-      appId: appId,
-    )) {
-      yield data;
-    }
-  }
+
   
   // 带类型参数的流式响应
   Stream<Map<String, dynamic>> sendMessageStreamWithConversationIdAndType({
     required String message,
     required String conversationId,
-    required String userId,
-    required String type,
+    String? type,
     String? appId,
   }) async* {
     try {
       _cancelToken = CancelToken();
       
       final Map<String, dynamic> requestData = {
-        'inputs': type.isNotEmpty ? {'type': type} : {},
+        'inputs': (type != null && type.isNotEmpty) ? {'type': type} : {},
         'query': message,
         'response_mode': 'streaming',
         'conversation_id': conversationId, // 总是传递字符串，空时为 ""
-        'user': userId,
       };
       
       if (appId != null && appId.isNotEmpty) {
@@ -127,9 +109,39 @@ class ChatRemoteDataSource {
                     'event': event,
                   };
                 }
+              } else if (event == 'tts_message') {
+                // 处理TTS音频块事件
+                final messageId = json['message_id'] as String?;
+                final audio = json['audio'] as String?;
+                if (messageId != null) {
+                  yield {
+                    'event': 'tts_message',
+                    'message_id': messageId,
+                    'audio': audio ?? '',
+                    'conversation_id': detectedConversationId ?? conversationId,
+                  };
+                }
+              } else if (event == 'tts_message_end') {
+                // 处理TTS消息结束事件
+                final messageId = json['message_id'] as String?;
+                if (messageId != null) {
+                  yield {
+                    'event': 'tts_message_end',
+                    'message_id': messageId,
+                    'conversation_id': detectedConversationId ?? conversationId,
+                  };
+                }
+              } else if (event == 'message_end') {
+                // 处理消息结束事件，获取message_id用于TTS
+                final messageId = json['id'] as String?;
+                if (messageId != null) {
+                  yield {
+                    'event': 'message_end',
+                    'message_id': messageId,
+                    'conversation_id': detectedConversationId ?? conversationId,
+                  };
+                }
               }
-              // 可以在这里添加对其他事件类型的处理
-              // 如 'tts_message', 'workflow_started' 等
               
             } catch (e) {
               print('解析流式数据错误: $e');

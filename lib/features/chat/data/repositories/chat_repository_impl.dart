@@ -27,31 +27,18 @@ class ChatRepositoryImpl implements ChatRepository {
     );
   }
 
-  @override
-  Stream<Map<String, dynamic>> sendMessageStreamWithConversationId({
-    required String message,
-    required String conversationId,
-    String? appId,
-  }) {
-    return _remoteDataSource.sendMessageStreamWithConversationId(
-      message: message,
-      conversationId: conversationId,
-      userId: _getCurrentUserId(),
-      appId: appId,
-    );
-  }
+
   
   @override
   Stream<Map<String, dynamic>> sendMessageStreamWithConversationIdAndType({
     required String message,
     required String conversationId,
-    required String type,
+    String? type,
     String? appId,
   }) {
     return _remoteDataSource.sendMessageStreamWithConversationIdAndType(
       message: message,
       conversationId: conversationId,
-      userId: _getCurrentUserId(),
       type: type,
       appId: appId,
     );

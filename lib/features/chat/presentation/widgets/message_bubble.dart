@@ -112,17 +112,19 @@ class MessageBubble extends StatelessWidget {
             },
             child: const Text('复制'),
           ),
-        // 朗读（仅在AI消息且有onPlayTTS回调时显示）
-        if (!message.isUser && onPlayTTS != null)
-          TextButton(
-            onPressed: () {
-              // 关闭选择菜单
-              editableTextState.hideToolbar();
-              // 触发朗读
-              onPlayTTS!();
-            },
-            child: const Text('朗读'),
-          ),
+        // 朗读（仅在AI消息时显示）- 暂时注释以测试流式TTS
+        // if (!message.isUser)
+        //   TextButton(
+        //     onPressed: () {
+        //       // 关闭选择菜单
+        //       editableTextState.hideToolbar();
+        //       // 触发朗读
+        //       // 获取选中的文本
+        //       final selectedText = editableTextState.textEditingValue.selection.textInside(text);
+        //       speak(selectedText);
+        //     },
+        //     child: const Text('朗读'),
+        //   ),
         // 词典功能
         if (!isCollapsed)
           TextButton(

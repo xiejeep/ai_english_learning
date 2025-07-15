@@ -1,7 +1,5 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:audioplayers/audioplayers.dart';
 import '../../data/datasources/chat_remote_datasource.dart';
 import '../../data/repositories/chat_repository_impl.dart';
 import '../../domain/repositories/chat_repository.dart';
@@ -9,7 +7,9 @@ import '../../../../shared/models/message_model.dart';
 import '../../domain/entities/conversation.dart';
 import 'chat_state.dart';
 import '../../../../core/storage/storage_service.dart';
-import '../../../../core/services/tts_cache_service.dart';
+import '../../../../core/services/stream_tts_service.dart';
+import '../../../../core/services/tts_event_handler.dart';
+import '../../../../core/services/message_id_mapping_service.dart';
 import '../../../auth/presentation/providers/user_profile_provider.dart';
 
 // 聊天相关的Provider
@@ -27,69 +27,42 @@ class ChatNotifier extends StateNotifier<ChatState> {
   final ChatRepository _repository;
   final Ref _ref;
   StreamSubscription<Map<String, dynamic>>? _streamSubscription;
-  static AudioPlayer? _audioPlayer;
+  
+  // 使用新的服务类
+  late final MessageIdMappingService _messageIdMappingService;
+  late final TTSEventHandler _ttsEventHandler;
 
   ChatNotifier(this._repository, this._ref) : super(const ChatState()) {
+    _messageIdMappingService = MessageIdMappingService();
+    _ttsEventHandler = TTSEventHandler(
+      onStateUpdate: (isLoading, isPlaying) {
+        state = state.copyWith(
+          isTTSLoading: isLoading,
+          isTTSPlaying: isPlaying,
+        );
+      },
+      onUserProfileRefresh: () {
+        try {
+          _ref.read(userProfileProvider.notifier).loadUserProfile();
+          print('✅ [STREAM TTS] TTS开始播放，已刷新用户资料');
+        } catch (e) {
+          print('⚠️ [STREAM TTS] TTS开始播放时刷新用户资料失败: $e');
+        }
+      },
+    );
     _loadInitialData();
-    _initAudioPlayer();
-    _initTTSCache();
+    _initStreamTTS();
   }
   
-  // 初始化TTS缓存服务
-  Future<void> _initTTSCache() async {
-    try {
-      await TTSCacheService.instance.initialize();
-      print('✅ TTS缓存服务初始化完成');
-    } catch (e) {
-      print('❌ TTS缓存服务初始化失败: $e');
-    }
+  // 初始化流式TTS服务
+  Future<void> _initStreamTTS() async {
+    await _ttsEventHandler.initialize();
   }
 
   // 加载初始数据
-  Future<void> _loadInitialData() async {    _initializeTTSSettings();
+  Future<void> _loadInitialData() async {
+    _initializeTTSSettings();
     // 不在初始化时加载会话，等待appId设置后再加载
-  }
-
-  // 初始化音频播放器
-  void _initAudioPlayer() {
-    if (_audioPlayer == null) {
-      _audioPlayer = AudioPlayer();
-      _audioPlayer!.onPlayerStateChanged.listen((playerState) {
-        print('🎵 播放器状态变化: $playerState');
-        
-        // 根据播放器状态更新TTS状态
-        if (playerState == PlayerState.playing) {
-          // 开始播放时设置播放状态，清除加载状态
-          state = state.copyWith(
-            isTTSLoading: false,
-            isTTSPlaying: true,
-          );
-          print('🔍 播放器状态监听器: 播放开始，isTTSPlaying=true');
-          
-          // TTS开始播放时刷新用户资料（表示API调用成功）
-          try {
-            _ref.read(userProfileProvider.notifier).loadUserProfile();
-            print('✅ TTS开始播放，已刷新用户资料');
-          } catch (e) {
-            print('⚠️ TTS开始播放时刷新用户资料失败: $e');
-          }
-        } else if (playerState == PlayerState.stopped) {
-          // 停止播放时清除播放状态
-          state = state.copyWith(
-            isTTSPlaying: false,
-          );
-          print('🔍 播放器状态监听器: 播放停止，isTTSPlaying=false');
-        }
-      });
-      _audioPlayer!.onPlayerComplete.listen((_) {
-        print('✅ 音频播放完成');
-        // 播放完成时清除所有TTS状态
-        state = state.copyWith(
-          isTTSLoading: false,
-          isTTSPlaying: false,
-        );
-      });
-    }
   }
 
   // 初始化TTS设置
@@ -321,7 +294,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   bool get canLoadMoreMessages => state.hasMoreMessages && !state.isLoadingMore;
 
   // 发送消息（流式响应，带type参数）
-  Future<void> sendMessageStreamWithType(String content, String type) async {
+  Future<void> sendMessageStreamWithType(String content, String? type) async {
     if (content.trim().isEmpty) return;
     
     // 获取当前会话ID
@@ -383,64 +356,98 @@ class ChatNotifier extends StateNotifier<ChatState> {
         type: type,
         appId: state.appId,
       ).listen(
-        (data) {
-          final chunk = data['content'] as String? ?? '';
-          final newConversationId = data['conversation_id'] as String?;
+        (data) async{
           
-          fullResponse += chunk;
-          
-          // 如果收到了新的会话ID，更新状态
-          if (newConversationId != null && newConversationId.isNotEmpty) {
-            // 如果当前会话ID为空或者是本地生成的，更新为Dify返回的真实ID
-            final currentConv = state.currentConversation;
-            if (currentConv == null || 
-                currentConv.id.isEmpty || 
-                currentConv.id.startsWith('conv_')) {
-              
-              // 创建/更新会话对象，使用Dify返回的真实ID
-              final updatedConversation = (currentConv ?? Conversation(
-                id: "",
-                title: '新对话',
-                createdAt: DateTime.now(),
-                updatedAt: DateTime.now(),
-                messageCount: 0,
-              )).copyWith(id: newConversationId);
-              
-              state = state.copyWith(currentConversation: updatedConversation);
-              
-              // 异步保存真实的会话到本地存储
-              _saveConversationAsync(updatedConversation);
-              
-              // 更新消息的会话ID
-              final updatedMessages = state.messages.map((msg) {
-                if (msg.id == userMessage.id) {
-                  return msg.copyWith(conversationId: newConversationId);
-                } else if (msg.id == tempAiMessage.id) {
-                  return msg.copyWith(conversationId: newConversationId);
-                }
-                return msg;
-              }).toList();
-              
-              state = state.copyWith(messages: updatedMessages);
+          final event = data['event'] as String?;
+          print('收到事件:${event}');
+          // 处理不同类型的事件
+          if (event == 'message' || event == 'agent_message' || event == null) {
+            // 处理普通消息事件
+            final chunk = data['content'] as String? ?? '';
+            final newConversationId = data['conversation_id'] as String?;
+            
+            fullResponse += chunk;
+            
+            // 如果收到了新的会话ID，更新状态
+            if (newConversationId != null && newConversationId.isNotEmpty) {
+              // 如果当前会话ID为空或者是本地生成的，更新为Dify返回的真实ID
+              final currentConv = state.currentConversation;
+              if (currentConv == null || 
+                  currentConv.id.isEmpty || 
+                  currentConv.id.startsWith('conv_')) {
+                
+                // 创建/更新会话对象，使用Dify返回的真实ID
+                final updatedConversation = (currentConv ?? Conversation(
+                  id: "",
+                  title: '新对话',
+                  createdAt: DateTime.now(),
+                  updatedAt: DateTime.now(),
+                  messageCount: 0,
+                )).copyWith(id: newConversationId);
+                
+                state = state.copyWith(currentConversation: updatedConversation);
+                
+                // 异步保存真实的会话到本地存储
+                _saveConversationAsync(updatedConversation);
+                
+                // 更新消息的会话ID
+                final updatedMessages = state.messages.map((msg) {
+                  if (msg.id == userMessage.id) {
+                    return msg.copyWith(conversationId: newConversationId);
+                  } else if (msg.id == tempAiMessage.id) {
+                    return msg.copyWith(conversationId: newConversationId);
+                  }
+                  return msg;
+                }).toList();
+                
+                state = state.copyWith(messages: updatedMessages);
+              }
+            }
+            
+            // 更新临时消息的内容（第一个chunk时清除"思考中"提示）
+            final displayContent = fullResponse.isEmpty ? '正在输入...' : fullResponse;
+            
+            // 更新临时AI消息的内容
+            final updatedMessages = state.messages.map((msg) {
+              if (msg.id == tempAiMessage.id) {
+                return msg.copyWith(content: displayContent);
+              }
+              return msg;
+            }).toList();
+            
+            state = state.copyWith(
+              messages: updatedMessages,
+              status: ChatStatus.streaming,
+              streamingMessage: fullResponse,
+            );
+          } else if (event == 'tts_message') {
+            // 处理TTS音频块事件
+            final messageId = data['message_id'] as String?;
+            final base64Audio = data['audio'] as String?;
+            if (messageId != null && base64Audio != null) {
+              // 使用原始消息ID（去掉_ai后缀）进行映射
+              final originalMessageId = _extractOriginalMessageId(messageId);
+              _messageIdMappingService.ensureMapping(originalMessageId, tempAiMessage.id);
+              _ttsEventHandler.handleTTSChunk(originalMessageId, base64Audio, _messageIdMappingService);
+            }
+          } else if (event == 'tts_message_end') {
+            // 处理TTS消息结束事件
+            final messageId = data['message_id'] as String?;
+            if (messageId != null) {
+              // 使用原始消息ID（去掉_ai后缀）进行映射
+              final originalMessageId = _extractOriginalMessageId(messageId);
+              _messageIdMappingService.ensureMapping(originalMessageId, tempAiMessage.id);
+              await _ttsEventHandler.handleTTSMessageEnd(originalMessageId, _messageIdMappingService);
+            }
+          } else if (event == 'message_end') {
+            // 处理消息结束事件，获取message_id用于TTS
+            final messageId = data['message_id'] as String?;
+            if (messageId != null) {
+              // 使用原始消息ID（去掉_ai后缀）进行映射
+              final originalMessageId = _extractOriginalMessageId(messageId);
+              _messageIdMappingService.ensureMapping(originalMessageId, tempAiMessage.id);
             }
           }
-          
-          // 更新临时消息的内容（第一个chunk时清除"思考中"提示）
-          final displayContent = fullResponse.isEmpty ? '正在输入...' : fullResponse;
-          
-          // 更新临时AI消息的内容
-          final updatedMessages = state.messages.map((msg) {
-            if (msg.id == tempAiMessage.id) {
-              return msg.copyWith(content: displayContent);
-            }
-            return msg;
-          }).toList();
-          
-          state = state.copyWith(
-            messages: updatedMessages,
-            status: ChatStatus.streaming,
-            streamingMessage: fullResponse,
-          );
         },
         onDone: () async {
           // 流式响应完成，直接替换临时AI消息内容和状态，不再插入新气泡
@@ -465,9 +472,12 @@ class ChatNotifier extends StateNotifier<ChatState> {
             streamingMessage: '',
           );
 
-          // 如果开启了自动播放，播放TTS
-          if (state.autoPlayTTS && fullResponse.isNotEmpty) {
-            playTTS(fullResponse);
+          // 如果开启了自动播放且当前没有在播放TTS，播放TTS
+          if (state.autoPlayTTS && fullResponse.isNotEmpty && !state.isTTSPlaying) {
+            print('🎵 [STREAM TTS] 自动播放TTS，当前播放状态: ${state.isTTSPlaying}');
+            playTTS(tempAiMessage.id);
+          } else if (state.isTTSPlaying) {
+            print('🎵 [STREAM TTS] 跳过自动播放，TTS已在播放中');
           }
           
           // AI回复完成后，刷新用户资料（包括token余额）
@@ -517,199 +527,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   // 发送消息（流式响应）
-  Future<void> sendMessageStream(String content) async {
-    if (content.trim().isEmpty) return;
-    
-    // 获取当前会话ID
-    // 只有当会话ID以真实的Dify格式开头时才使用，否则传递空字符串
-    String conversationId = "";
-    final currentConv = state.currentConversation;
-    if (currentConv != null && currentConv.id.isNotEmpty) {
-      // 检查是否是有效的Dify会话ID（不是我们本地生成的格式）
-      if (!currentConv.id.startsWith('conv_')) {
-        conversationId = currentConv.id;
-      }
-      // 如果是本地生成的ID（conv_开头），则传递空字符串让Dify创建新会话
-    }
 
-    try {
-      // 创建用户消息和AI消息，确保id唯一
-      final baseId = _generateMessageId();
-      final userMessage = MessageModel(
-        id: '${baseId}_user',
-        content: content,
-        type: MessageType.user,
-        status: MessageStatus.sent,
-        timestamp: DateTime.now(),
-        conversationId: conversationId,
-      );
-
-      // 创建临时AI消息用于显示流式响应
-      final tempAiMessage = MessageModel(
-        id: '${baseId}_ai',
-        content: '正在思考中...',
-        type: MessageType.ai,
-        status: MessageStatus.received,
-        timestamp: DateTime.now(),
-        conversationId: conversationId,
-      );
-
-      // 添加用户消息和临时AI消息到消息列表末尾
-      final updatedMessages = [...state.messages, userMessage, tempAiMessage];
-      
-      // 立即更新状态，显示用户消息和思考中的AI消息
-      state = state.copyWith(
-        messages: updatedMessages,
-        status: ChatStatus.sending,
-        isStreaming: true,
-      );
-
-      // 保存用户消息
-      await _repository.saveMessage(userMessage);
-
-      // 设置AI思考中状态
-      state = state.copyWith(status: ChatStatus.thinking);
-
-      String fullResponse = '';
-
-      // 开始流式响应
-      _streamSubscription = _repository.sendMessageStreamWithConversationId(
-        message: content,
-        conversationId: conversationId,
-        appId: state.appId,
-      ).listen(
-        (data) {
-          final chunk = data['content'] as String? ?? '';
-          final newConversationId = data['conversation_id'] as String?;
-          
-          fullResponse += chunk;
-          
-          // 如果收到了新的会话ID，更新状态
-          if (newConversationId != null && newConversationId.isNotEmpty) {
-            // 如果当前会话ID为空或者是本地生成的，更新为Dify返回的真实ID
-            final currentConv = state.currentConversation;
-            if (currentConv == null || 
-                currentConv.id.isEmpty || 
-                currentConv.id.startsWith('conv_')) {
-              
-              // 创建/更新会话对象，使用Dify返回的真实ID
-              final updatedConversation = (currentConv ?? Conversation(
-                id: "",
-                title: '新对话',
-                createdAt: DateTime.now(),
-                updatedAt: DateTime.now(),
-                messageCount: 0,
-              )).copyWith(id: newConversationId);
-              
-              state = state.copyWith(currentConversation: updatedConversation);
-              
-              // 异步保存真实的会话到本地存储
-              _saveConversationAsync(updatedConversation);
-              
-              // 更新消息的会话ID
-              final updatedMessages = state.messages.map((msg) {
-                if (msg.id == userMessage.id) {
-                  return msg.copyWith(conversationId: newConversationId);
-                } else if (msg.id == tempAiMessage.id) {
-                  return msg.copyWith(conversationId: newConversationId);
-                }
-                return msg;
-              }).toList();
-              
-              state = state.copyWith(messages: updatedMessages);
-            }
-          }
-          
-          // 更新临时消息的内容（第一个chunk时清除"思考中"提示）
-          final displayContent = fullResponse.isEmpty ? '正在输入...' : fullResponse;
-          
-          // 更新临时AI消息的内容
-          final updatedMessages = state.messages.map((msg) {
-            if (msg.id == tempAiMessage.id) {
-              return msg.copyWith(content: displayContent);
-            }
-            return msg;
-          }).toList();
-          
-          state = state.copyWith(
-            messages: updatedMessages,
-            status: ChatStatus.streaming,
-            streamingMessage: fullResponse,
-          );
-        },
-        onDone: () async {
-          // 流式响应完成，直接替换临时AI消息内容和状态，不再插入新气泡
-          final updatedMessages = state.messages.map((msg) {
-            if (msg.id == tempAiMessage.id) {
-              return msg.copyWith(
-                content: fullResponse,
-                status: MessageStatus.received,
-              );
-            }
-            return msg;
-          }).toList();
-
-          await _repository.saveMessage(
-            tempAiMessage.copyWith(content: fullResponse, status: MessageStatus.received),
-          );
-
-          state = state.copyWith(
-            messages: updatedMessages,
-            status: ChatStatus.success,
-            isStreaming: false,
-            streamingMessage: '',
-          );
-
-          // 如果开启了自动播放，播放TTS
-          if (state.autoPlayTTS && fullResponse.isNotEmpty) {
-            playTTS(fullResponse);
-          }
-          
-          // AI回复完成后，刷新用户资料（包括token余额）
-          try {
-            // 通过ref刷新用户资料
-            _ref.read(userProfileProvider.notifier).loadUserProfile();
-            print('✅ AI回复完成，已刷新用户资料');
-          } catch (e) {
-            print('⚠️ 刷新用户资料失败: $e');
-          }
-        },
-        onError: (error) {
-          // 处理错误：移除临时AI消息，并将用户消息标记为失败
-          print('❌ 消息发送失败: $error');
-          
-          final errorUpdatedMessages = state.messages
-              .where((msg) => msg.id != tempAiMessage.id)
-              .map((msg) {
-                // 将用户消息标记为失败，并添加错误信息
-                if (msg.id == userMessage.id) {
-                  // 清理错误消息，移除Exception前缀
-                  String cleanErrorMessage = error.toString();
-                  if (cleanErrorMessage.startsWith('Exception: ')) {
-                    cleanErrorMessage = cleanErrorMessage.substring(11);
-                  }
-                  return msg.copyWith(
-                    status: MessageStatus.failed,
-                    errorMessage: cleanErrorMessage,
-                  );
-                }
-                return msg;
-              })
-              .toList();
-          
-          state = state.copyWith(
-            messages: errorUpdatedMessages,
-            status: ChatStatus.error,
-            error: '发送消息失败: $error',
-            isStreaming: false,
-            streamingMessage: '',
-          );
-        },
-      );
-    } catch (e) {
-      state = state.setError('发送消息失败: $e');
-    }
-  }
 
   // 停止AI生成
   Future<void> stopGeneration() async {
@@ -743,8 +561,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
       
       state = state.copyWith(messages: updatedMessages);
       
-      // 重新发送消息
-      await sendMessageStream(failedMessage.content);
+      // 重新发送消息，使用统一的方法
+      await sendMessageStreamWithType(failedMessage.content, null);
       
     } catch (e) {
       print('❌ 重试消息失败: $e');
@@ -815,128 +633,93 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
-  // 播放TTS（带缓存功能）
-  Future<void> playTTS(String text) async {
+  // 播放TTS（使用流式TTS服务播放缓存的音频）
+  Future<void> playTTS(String messageId) async {
     // 如果正在播放，先停止
     if (state.isTTSPlaying) {
       await stopTTS();
     }
     
     try {
-      print('🔊 正在获取TTS音频: ${text.substring(0, text.length.clamp(0, 50))}...');
+      print('🔊 [STREAM TTS] 开始播放消息音频: $messageId');
       
       // 设置加载状态
       state = state.copyWith(
         isTTSLoading: true,
         isTTSPlaying: false,
       );
-      print('🔍 TTS加载开始: isTTSLoading=true');
+      print('🔍 [STREAM TTS] TTS加载开始: isTTSLoading=true');
       
-      // 确保音频播放器已初始化
-      _initAudioPlayer();
-      
-      // 停止当前播放
-      if (_audioPlayer!.state == PlayerState.playing) {
-        await _audioPlayer!.stop();
+      // 确保流式TTS服务已初始化
+      if (!StreamTTSService.instance.isInitialized) {
+        print('🔧 [STREAM TTS] 服务未初始化，正在初始化...');
+        await StreamTTSService.instance.initialize();
       }
       
-      String audioFilePath;
+      // 直接使用本地消息ID播放音频文件
+      // 因为音频文件是用本地消息ID保存的
+      await StreamTTSService.instance.playMessageAudio(messageId);
+      print('🎯 [STREAM TTS] 使用本地消息ID播放: $messageId');
       
-      // 首先检查缓存
-      final cachedPath = await TTSCacheService.instance.getCachedAudioPath(text);
-      if (cachedPath != null) {
-        print('🎯 使用缓存音频文件: $cachedPath');
-        audioFilePath = cachedPath;
-      } else {
-        print('📡 从服务器获取TTS音频...');
-        // 从服务器获取音频文件
-        final tempAudioPath = await _repository.getTTSAudio(text, appId: state.appId);
-        print('✅ 音频文件获取成功: $tempAudioPath');
-        
-        // 缓存音频文件
-        try {
-          audioFilePath = await TTSCacheService.instance.cacheAudioFile(text, tempAudioPath);
-          print('💾 音频文件已缓存: $audioFilePath');
-          
-          // 删除临时文件
-          final tempFile = File(tempAudioPath);
-          if (await tempFile.exists()) {
-            await tempFile.delete();
-            print('🗑️ 临时文件已删除: $tempAudioPath');
-          }
-        } catch (cacheError) {
-          print('⚠️ 缓存音频文件失败: $cacheError，使用临时文件');
-          audioFilePath = tempAudioPath;
-        }
-      }
+      print('🎯 [STREAM TTS] 消息音频播放启动成功');
+    } catch (e) {
+      print('❌ [STREAM TTS] 播放TTS失败: $e');
       
-      // 验证文件是否存在
-      final audioFile = File(audioFilePath);
-      if (!await audioFile.exists()) {
-        throw Exception('音频文件不存在: $audioFilePath');
-      }
-      
-      final fileSize = await audioFile.length();
-      print('📁 音频文件信息: 路径=$audioFilePath, 大小=$fileSize 字节');
-      
-      // 验证音频文件格式
-      final audioBytes = await audioFile.readAsBytes();
-      if (audioBytes.length < 10) {
-        throw Exception('音频文件太小，可能损坏');
-      }
-      
-      // 检查MP3文件头
-      final header = String.fromCharCodes(audioBytes.take(3));
-      if (header != 'ID3' && audioBytes[0] != 0xFF) {
-        print('⚠️ 音频文件格式可能不标准，尝试播放...');
-      }
-      
-      // 播放音频文件
-      print('🎯 开始播放音频文件...');
-      
-      await _audioPlayer!.play(DeviceFileSource(audioFilePath));
-      print('🎵 音频播放已启动');
-      
-      // 播放成功，状态将在onPlayerStateChanged中自动更新
-      print('🎯 TTS播放启动成功，等待播放器状态更新');
-      
-    } catch (e, stackTrace) {
-      print('❌ 播放TTS失败: $e');
-      print('📋 错误堆栈: $stackTrace');
-      
-      // 立即清除所有TTS状态
-      state = state.copyWith(
-        isTTSLoading: false,
-        isTTSPlaying: false,
-      );
-      
-      // 尝试重新初始化播放器
+      // 如果直接播放失败，尝试查找服务器消息ID
       try {
-        await _audioPlayer?.dispose();
-        _audioPlayer = null;
-        _initAudioPlayer();
-        print('🔄 音频播放器已重新初始化');
-      } catch (reinitError) {
-        print('❌ 重新初始化播放器失败: $reinitError');
+        final serverMessageId = _messageIdMappingService.getServerMessageId(messageId);
+        
+        if (serverMessageId != null) {
+          print('🔄 [STREAM TTS] 尝试使用服务器消息ID播放: $serverMessageId');
+          await StreamTTSService.instance.playMessageAudio(serverMessageId);
+          print('🎯 [STREAM TTS] 服务器消息ID播放成功');
+          return;
+        }
+        
+        // 最后尝试使用原始消息ID（去掉_ai后缀）
+        final originalMessageId = _extractOriginalMessageId(messageId);
+        print('🔄 [STREAM TTS] 尝试使用原始消息ID: $originalMessageId');
+        await StreamTTSService.instance.playMessageAudio(originalMessageId);
+        print('🎯 [STREAM TTS] 原始消息ID播放成功');
+      } catch (fallbackError) {
+        print('❌ [STREAM TTS] 所有播放尝试都失败: $fallbackError');
+        
+        // 立即清除所有TTS状态
+        state = state.copyWith(
+          isTTSLoading: false,
+          isTTSPlaying: false,
+        );
       }
     }
+  }
+
+  // 播放TTS（兼容旧接口，根据内容查找消息ID）
+  Future<void> playTTSByContent(String content) async {
+    // 根据内容查找对应的消息ID
+    final message = state.messages.lastWhere(
+      (msg) => msg.content == content && msg.isAI,
+      orElse: () => throw Exception('未找到对应的消息'),
+    );
+    
+    await playTTS(message.id);
   }
   
   // 停止TTS播放
   Future<void> stopTTS() async {
     try {
-      print('🛑 停止TTS播放');
-      if (_audioPlayer != null && _audioPlayer!.state == PlayerState.playing) {
-        await _audioPlayer!.stop();
-      }
+      print('🛑 [STREAM TTS] 停止流式TTS播放');
+      
+      // 停止流式TTS
+      await StreamTTSService.instance.stop();
+      
       // 清除所有TTS状态
       state = state.copyWith(
         isTTSLoading: false,
         isTTSPlaying: false,
       );
-      print('✅ TTS状态已清除');
+      print('✅ [STREAM TTS] TTS状态已清除');
     } catch (e) {
-      print('❌ 停止TTS播放失败: $e');
+      print('❌ [STREAM TTS] 停止TTS播放失败: $e');
       // 即使停止失败，也要清除状态
       state = state.copyWith(
         isTTSLoading: false,
@@ -954,29 +737,17 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWith(autoPlayTTS: newValue);
   }
   
-  // 获取TTS缓存统计信息
-  Future<Map<String, dynamic>> getTTSCacheStats() async {
+  // 清理TTS缓存
+  Future<void> clearTTSCache() async {
     try {
-      return await TTSCacheService.instance.getCacheStats();
+      await StreamTTSService.instance.clearCache();
+      print('✅ [STREAM TTS] 缓存已清理');
     } catch (e) {
-      print('❌ 获取TTS缓存统计失败: $e');
-      return {
-        'error': e.toString(),
-        'fileCount': 0,
-        'totalSizeMB': 0.0,
-      };
+      print('❌ [STREAM TTS] 清理缓存失败: $e');
     }
   }
   
-  // 清空TTS缓存
-  Future<void> clearTTSCache() async {
-    try {
-      await TTSCacheService.instance.clearAllCache();
-      print('✅ TTS缓存已清空');
-    } catch (e) {
-      print('❌ 清空TTS缓存失败: $e');
-    }
-  }
+
 
   // 清除错误状态
   void clearError() {
@@ -988,12 +759,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
     return 'msg_${DateTime.now().millisecondsSinceEpoch}';
   }
 
-  // 提取原始消息ID（去掉_user或_assistant后缀）
+  // 提取原始消息ID（去掉_user、_assistant或_ai后缀）
   String _extractOriginalMessageId(String messageId) {
     if (messageId.endsWith('_user')) {
       return messageId.substring(0, messageId.length - 5); // 去掉'_user'
     } else if (messageId.endsWith('_assistant')) {
       return messageId.substring(0, messageId.length - 10); // 去掉'_assistant'
+    } else if (messageId.endsWith('_ai')) {
+      return messageId.substring(0, messageId.length - 3); // 去掉'_ai'
     }
     return messageId; // 如果没有后缀，直接返回原ID
   }
@@ -1007,15 +780,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
   @override
   void dispose() {
     _streamSubscription?.cancel();
-    _audioPlayer?.dispose();
-    _audioPlayer = null;
+    _messageIdMappingService.clear();
+    _ttsEventHandler.dispose();
     super.dispose();
   }
 
   // 初始化聊天，加载最新会话
   Future<void> initializeChat() async {
     try {
-      print('🚀 [ChatPage] 开始初始化聊天...');
+      print('🚀 [AnimatedChatPage] 开始初始化聊天...');
       
       state = state.copyWith(
         status: ChatStatus.loading,

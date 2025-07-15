@@ -2,25 +2,15 @@ import '../../../../shared/models/message_model.dart';
 import '../entities/conversation.dart';
 
 abstract class ChatRepository {
-  // 发送消息并获取AI回复（流式）
-  Stream<String> sendMessageStream({
-    required String message,
-    required String conversationId,
-    String? appId,
-  });
 
-  // 发送消息并返回包含会话ID的流式响应
-  Stream<Map<String, dynamic>> sendMessageStreamWithConversationId({
-    required String message,
-    required String conversationId,
-    String? appId,
-  });
+
+
   
   // 发送消息并返回包含会话ID的流式响应（带type参数）
   Stream<Map<String, dynamic>> sendMessageStreamWithConversationIdAndType({
     required String message,
     required String conversationId,
-    required String type,
+    String? type,
     String? appId,
   });
   

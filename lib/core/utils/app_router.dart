@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
-import '../../features/chat/presentation/pages/chat_page.dart';
 import '../../features/chat/presentation/pages/animated_chat_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../constants/app_constants.dart';
@@ -26,7 +25,7 @@ class AppRouter {
           final type = state.uri.queryParameters['type'];
           final appId = state.uri.queryParameters['appId'];
           final appName = state.uri.queryParameters['appName'];
-          return ChatPage(type: type, appId: appId, appName: appName);
+          return AnimatedChatPage(type: type, appId: appId, appName: appName);
         },
       ),
       GoRoute(

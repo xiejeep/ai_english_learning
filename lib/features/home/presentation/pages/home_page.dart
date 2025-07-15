@@ -15,8 +15,9 @@ class HomePage extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     final difyAppsState = ref.watch(difyAppsProvider);
     
-    // 监听认证状态变化，处理登录过期
+    // 监听认证状态变化
     ref.listen<AuthState>(authProvider, (previous, next) {
+      // 处理登录过期
       if (next.isUnauthenticated && next.errorMessage?.contains('登录已过期') == true) {
         // 清除Dify应用状态，重置为初始状态
         ref.read(difyAppsProvider.notifier).reset();
@@ -33,6 +34,17 @@ class HomePage extends ConsumerWidget {
         
         // 跳转到登录页面
         context.go(AppConstants.loginRoute);
+        return;
+      }
+      
+      // 处理认证成功时加载应用列表
+      // 重要：无论之前的状态如何，只要检测到登录成功，就强制重新加载应用列表
+      if (previous != null && 
+          !previous.isAuthenticated && 
+          next.isAuthenticated) {
+        print('✅ [HomePage] 检测到登录成功，强制重新加载应用列表');
+        // 使用 forceRefresh 确保完全重置状态并重新加载
+        ref.read(difyAppsProvider.notifier).forceRefresh();
       }
     });
     
@@ -49,8 +61,7 @@ class HomePage extends ConsumerWidget {
               label: '重试',
               textColor: Colors.white,
               onPressed: () {
-                ref.read(difyAppsProvider.notifier).clearError();
-                ref.read(difyAppsProvider.notifier).loadDifyApps();
+                ref.read(difyAppsProvider.notifier).forceRefresh();
               },
             ),
           ),
@@ -58,29 +69,22 @@ class HomePage extends ConsumerWidget {
       }
     });
     
-    // 监听认证状态变化，在认证成功时加载Dify应用列表
-    ref.listen<AuthState>(authProvider, (previous, next) {
-      // 只在从未认证状态变为已认证状态时，且未加载过数据时才加载
-      if (previous != null && 
-          !previous.isAuthenticated && 
-          next.isAuthenticated && 
-          !difyAppsState.hasLoaded && 
-          !difyAppsState.isLoading) {
-        ref.read(difyAppsProvider.notifier).loadDifyApps();
-      }
-    });
-    
-    // 首次加载：如果用户已认证且未加载过数据，则加载应用列表
-    // 使用addPostFrameCallback确保在build完成后执行，但只执行一次
-    if (authState.isAuthenticated && !difyAppsState.hasLoaded && !difyAppsState.isLoading) {
+    // 首次加载：如果用户已认证，则加载应用列表（无论之前的状态如何）
+    // 使用addPostFrameCallback确保在build完成后执行
+    if (authState.isAuthenticated && !difyAppsState.isLoading) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         // 再次检查状态，确保在回调执行时状态仍然满足条件
         final currentAuthState = ref.read(authProvider);
         final currentDifyAppsState = ref.read(difyAppsProvider);
-        if (currentAuthState.isAuthenticated && 
-            !currentDifyAppsState.hasLoaded && 
-            !currentDifyAppsState.isLoading) {
-          ref.read(difyAppsProvider.notifier).loadDifyApps();
+        
+        if (currentAuthState.isAuthenticated && !currentDifyAppsState.isLoading) {
+          // 如果未加载过，或者有错误状态，或者应用列表为空，则重新加载
+          if (!currentDifyAppsState.hasLoaded || 
+              currentDifyAppsState.errorMessage != null ||
+              currentDifyAppsState.apps.isEmpty) {
+            print('✅ [HomePage] 首次加载：用户已认证，开始加载应用列表');
+            ref.read(difyAppsProvider.notifier).forceRefresh();
+          }
         }
       });
     }
@@ -241,7 +245,7 @@ class HomePage extends ConsumerWidget {
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: () {
-                ref.read(difyAppsProvider.notifier).loadDifyApps();
+                ref.read(difyAppsProvider.notifier).forceRefresh();
               },
               icon: const Icon(Icons.refresh),
               label: const Text('重试'),
@@ -285,7 +289,7 @@ class HomePage extends ConsumerWidget {
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: () {
-                ref.read(difyAppsProvider.notifier).refreshApps();
+                ref.read(difyAppsProvider.notifier).forceRefresh();
               },
               icon: const Icon(Icons.refresh),
               label: const Text('刷新'),

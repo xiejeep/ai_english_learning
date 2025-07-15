@@ -9,6 +9,7 @@ import 'core/utils/app_router.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/auth/presentation/providers/auth_state.dart';
 import 'features/auth/presentation/providers/user_profile_provider.dart';
+import 'features/home/presentation/providers/dify_apps_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,16 +55,26 @@ class MyApp extends ConsumerWidget {
       if (previous?.isAuthenticated == true && next.isUnauthenticated) {
         // 从已认证状态变为未认证状态，说明token过期
         if (next.errorMessage?.contains('登录已过期') == true) {
+          // 清除 Dify 应用状态
+          ref.read(difyAppsProvider.notifier).reset();
+          
           // 跳转到登录页面
           final router = GoRouter.of(context);
           router.go(AppConstants.loginRoute);
           print('✅ [MyApp] 检测到登录过期，已跳转到登录页面');
         }
       }
-      // 新增：认证成功时预加载用户信息
+      // 认证成功时预加载用户信息
       if (next.isAuthenticated) {
         print('[MyApp] 认证成功，预加载用户信息...');
         ref.read(userProfileProvider.notifier).loadUserProfile();
+        
+        // 如果之前有认证状态且从未认证变为已认证，说明是重新登录
+        if (previous != null && !previous.isAuthenticated) {
+          print('✅ [MyApp] 检测到重新登录成功，清除 Dify 应用状态');
+          // 清除可能存在的错误状态，为重新加载做准备
+          ref.read(difyAppsProvider.notifier).reset();
+        }
       }
     });
 

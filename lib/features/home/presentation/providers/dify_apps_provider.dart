@@ -114,6 +114,22 @@ class DifyAppsNotifier extends StateNotifier<DifyAppsState> {
     }
   }
 
+  // 处理登录成功时的应用列表加载
+  Future<void> loadAppsAfterLogin() async {
+    print('🔑 [DifyAppsNotifier] 处理登录成功，重新加载应用列表');
+    // 完全重置状态，确保获取最新数据
+    state = const DifyAppsState();
+    await loadDifyApps();
+  }
+
+  // 强制刷新应用列表（清空当前数据重新加载）
+  Future<void> forceRefresh() async {
+    print('🔄 [DifyAppsNotifier] 强制刷新应用列表，清除所有状态');
+    // 完全重置状态，包括清除错误信息
+    state = const DifyAppsState();
+    await loadDifyApps();
+  }
+
   // 刷新应用列表
   Future<void> refreshApps() async {
     // 重置加载状态，允许重新加载

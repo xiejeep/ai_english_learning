@@ -52,7 +52,7 @@ dependencies:
   cached_network_image: ^3.3.0
 
   # 音频播放
-  audioplayers: ^5.0.0
+  just_audio: ^0.9.36
   
   # 路径提供者
   path_provider: ^2.1.0

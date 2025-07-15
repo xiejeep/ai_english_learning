@@ -297,7 +297,7 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
                       if (state.isTTSPlaying) {
                         ref.read(chatProvider.notifier).stopTTS();
                       } else {
-                        ref.read(chatProvider.notifier).playTTS(msg.content);
+                        ref.read(chatProvider.notifier).playTTS(msg.id);
                       }
                     }
                   : null,
@@ -438,11 +438,8 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
 
     FocusScope.of(context).unfocus();
 
-    if (widget.type != null) {
-      ref.read(chatProvider.notifier).sendMessageStreamWithType(content, widget.type!);
-    } else {
-      ref.read(chatProvider.notifier).sendMessageStream(content);
-    }
+    // 统一使用 sendMessageStreamWithType 方法，如果没有指定类型则传入 null
+    ref.read(chatProvider.notifier).sendMessageStreamWithType(content, widget.type);
     
     _messageController.clear();
   }
