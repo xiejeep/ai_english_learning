@@ -6,9 +6,9 @@ class AppConstants {
   static const String appVersion = '1.0.0';
   
   // API配置
-  // static const String baseUrl = 'https://app.classhorse.cn/';
+  static const String baseUrl = 'https://app.classhorse.cn/';
   // static const String baseUrl = 'http://192.168.8.167:3000/';
-  static const String baseUrl = 'http://app.classhorse.top:3000/';
+  // static const String baseUrl = 'http://app.classhorse.top:3000/';
   static const String apiVersion = 'v1';
   
   // API路径
@@ -49,6 +49,7 @@ class AppConstants {
   static const String voiceSettingsRoute = '/voice-settings';
   static const String blankRoute = '/blank';
   static const String dictionaryRoute = '/dictionary';
+  static const String aboutRoute = '/about';
   
   // 存储键名
   static const String tokenKey = 'user_token';
@@ -61,6 +62,8 @@ class AppConstants {
   static const String rememberedAccountsKey = 'remembered_accounts';
   static const String lastLoginEmailKey = 'last_login_email';
   static const String rememberAccountKey = 'remember_account';
+  static const String difyAppsCacheKey = 'dify_apps_cache';
+  static const String difyAppsCacheTimeKey = 'dify_apps_cache_time';
   
   // 默认值
   static const int defaultTimeout = 10000; // 10秒 - 缩短超时时间

@@ -311,7 +311,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
     String processedContent = htmlContent;
     
     // 处理CSS文件的href属性 - 修复正则表达式以匹配/api开头的路径
-    final cssLinkMatches = RegExp('href="(/api/dictionary/resource/[^/]+/[^"]*\.css)"', caseSensitive: false).allMatches(htmlContent);
+    final cssLinkMatches = RegExp('href="(/api/dictionary/resource/[^/]+/[^"]*.css)"', caseSensitive: false).allMatches(htmlContent);
     print('🔍 找到 ${cssLinkMatches.length} 个CSS link标签');
     
     for (final match in cssLinkMatches) {
@@ -371,7 +371,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
     String processedContent = htmlContent;
     
     // 处理图片文件 - 修复正则表达式以匹配/api开头的路径
-    final imageMatches = RegExp('src="(/api/dictionary/resource/[^/]+/[^"]*\.(png|jpg|jpeg|gif|svg|webp))"', caseSensitive: false).allMatches(htmlContent);
+    final imageMatches = RegExp('src="(/api/dictionary/resource/[^/]+/[^"]*.(png|jpg|jpeg|gif|svg|webp))"', caseSensitive: false).allMatches(htmlContent);
     print('🔍 找到 ${imageMatches.length} 个图片文件');
     
     for (final match in imageMatches) {
@@ -386,7 +386,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
     }
     
     // 处理音频文件 - 修复正则表达式以匹配/api开头的路径
-    final audioMatches = RegExp('src="(/api/dictionary/resource/[^/]+/[^"]*\.(mp3|wav|ogg|m4a))"', caseSensitive: false).allMatches(htmlContent);
+    final audioMatches = RegExp('src="(/api/dictionary/resource/[^/]+/[^"]*.(mp3|wav|ogg|m4a))"', caseSensitive: false).allMatches(htmlContent);
     print('🔍 找到 ${audioMatches.length} 个音频文件');
     
     for (final match in audioMatches) {

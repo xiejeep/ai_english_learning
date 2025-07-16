@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
@@ -38,6 +37,10 @@ class PlaylistTTSService {
   int _segmentCounter = 0;
   bool _isFirstSegment = true;
   bool _isCreatingSegment = false; // 段创建锁，防止并发问题
+  
+  // 优化的锁机制：音频块处理队列
+  final List<Uint8List> _pendingChunks = []; // 等待处理的音频块队列
+  bool _isProcessingQueue = false; // 队列处理锁
   
   // 配置
   final TTSConfig _config = TTSConfig.instance;
@@ -373,32 +376,65 @@ class PlaylistTTSService {
     }
   }
   
-  /// 使用缓冲合并机制处理音频块
+  /// 使用缓冲合并机制处理音频块（优化版本）
   Future<void> _processChunkWithBuffering(String messageId, Uint8List audioData) async {
-    // 添加到缓冲区
-    _audioChunkBuffer.add(audioData);
+    // 将音频块添加到待处理队列
+    _pendingChunks.add(audioData);
     
-    print('🔄 [PlaylistTTS] 缓冲区状态: ${_audioChunkBuffer.length} 个音频块, 正在创建段: $_isCreatingSegment');
+    print('🔄 [PlaylistTTS] 音频块已加入队列，队列长度: ${_pendingChunks.length}, 缓冲区: ${_audioChunkBuffer.length}, 正在创建段: $_isCreatingSegment');
     
-    // 如果正在创建段，跳过本次检查
-    if (_isCreatingSegment) {
-      print('⏳ [PlaylistTTS] 段创建中，跳过本次检查');
-      return;
+    // 如果队列处理器没有运行，启动它
+    if (!_isProcessingQueue) {
+      _processChunkQueue(messageId);
     }
+  }
+  
+  /// 处理音频块队列（确保所有音频块都被处理）
+  Future<void> _processChunkQueue(String messageId) async {
+    if (_isProcessingQueue) return;
     
-    // 检查是否需要合并并播放
-    bool shouldCreateSegment = false;
+    _isProcessingQueue = true;
     
-    if (_isFirstSegment && _config.fastFirstSegment) {
-      // 第一段：收到第一个块就立即播放（减少延迟）
-      shouldCreateSegment = _audioChunkBuffer.length >= 1;
-    } else {
-      // 后续段：等待指定数量的块
-      shouldCreateSegment = _audioChunkBuffer.length >= _config.chunksPerSegment;
-    }
-    
-    if (shouldCreateSegment) {
-      await _createAndPlaySegment(messageId);
+    try {
+      while (_pendingChunks.isNotEmpty) {
+        // 从队列中取出音频块并添加到缓冲区
+        final chunk = _pendingChunks.removeAt(0);
+        _audioChunkBuffer.add(chunk);
+        
+        print('📦 [PlaylistTTS] 处理队列中的音频块，缓冲区现有: ${_audioChunkBuffer.length} 个音频块');
+        
+        // 检查是否需要创建段
+        bool shouldCreateSegment = false;
+        
+        if (_isFirstSegment && _config.fastFirstSegment) {
+          // 第一段：收到第一个块就立即播放（减少延迟）
+          shouldCreateSegment = _audioChunkBuffer.isNotEmpty;
+        } else {
+          // 后续段：等待指定数量的块
+          shouldCreateSegment = _audioChunkBuffer.length >= _config.chunksPerSegment;
+        }
+        
+        if (shouldCreateSegment && !_isCreatingSegment) {
+          await _createAndPlaySegment(messageId);
+          // 段创建完成后，继续处理队列中剩余的音频块
+        }
+        
+        // 如果正在创建段，暂停队列处理，等待段创建完成
+        if (_isCreatingSegment) {
+          print('⏳ [PlaylistTTS] 段创建中，暂停队列处理');
+          break;
+        }
+      }
+    } catch (e) {
+      print('❌ [PlaylistTTS] 处理音频块队列失败: $e');
+    } finally {
+      _isProcessingQueue = false;
+      
+      // 如果队列中还有待处理的音频块，重新启动处理器
+      if (_pendingChunks.isNotEmpty) {
+        print('🔄 [PlaylistTTS] 队列中还有 ${_pendingChunks.length} 个音频块待处理，重新启动处理器');
+        _processChunkQueue(messageId);
+      }
     }
   }
   
@@ -454,6 +490,12 @@ class PlaylistTTSService {
       // 无论成功还是失败，都要释放锁
       _isCreatingSegment = false;
       print('🔓 [PlaylistTTS] 段创建锁已释放');
+      
+      // 段创建完成后，如果队列中还有待处理的音频块，重新启动队列处理器
+      if (_pendingChunks.isNotEmpty && !_isProcessingQueue) {
+        print('🔄 [PlaylistTTS] 段创建完成，重新启动队列处理器处理剩余的 ${_pendingChunks.length} 个音频块');
+        _processChunkQueue(messageId);
+      }
     }
   }
   
@@ -540,6 +582,10 @@ class PlaylistTTSService {
       _audioChunkBuffer.clear();
       _isPlaying = false;
       
+      // 重置优化锁机制相关状态
+      _pendingChunks.clear();
+      _isProcessingQueue = false;
+      
       print('🔄 [PlaylistTTS] 开始新消息: $messageId');
     } catch (e) {
       print('❌ [PlaylistTTS] 开始新消息失败: $e');
@@ -576,12 +622,22 @@ class PlaylistTTSService {
     print('🔍 [PlaylistTTS] 当前消息ID: $_currentMessageId');
     print('🔍 [PlaylistTTS] 音频块文件数量: ${_audioChunkFiles.length}');
     print('🔍 [PlaylistTTS] 缓冲区音频块数量: ${_audioChunkBuffer.length}');
+    print('🔍 [PlaylistTTS] 待处理队列音频块数量: ${_pendingChunks.length}');
     
     if (_currentMessageId == messageId) {
+      // 确保所有待处理的音频块都被处理完成
+      if (_config.chunkMergingEnabled && _pendingChunks.isNotEmpty) {
+        print('🔄 [PlaylistTTS] 处理队列中剩余的 ${_pendingChunks.length} 个音频块');
+        // 等待队列处理完成
+        while (_pendingChunks.isNotEmpty || _isProcessingQueue) {
+          await Future.delayed(const Duration(milliseconds: 10));
+        }
+      }
+      
       // 如果启用了缓冲合并且缓冲区还有剩余的音频块，创建最后一个段
       if (_config.chunkMergingEnabled && _audioChunkBuffer.isNotEmpty) {
         await _createAndPlaySegment(messageId);
-        print('🎯 [PlaylistTTS] 处理剩余的 ${_audioChunkBuffer.length} 个音频块');
+        print('🎯 [PlaylistTTS] 处理缓冲区剩余的音频块');
       }
       
       print('✅ [PlaylistTTS] 消息 $messageId 的所有音频块已接收完成');
@@ -754,6 +810,9 @@ class PlaylistTTSService {
             await _playlist?.clear();
             await _playlist?.add(audioSource);
           }
+          
+          // 重置播放位置到开头，确保从头开始播放
+          await _player?.seek(Duration.zero);
           
           // 开始播放
           await _player?.play();

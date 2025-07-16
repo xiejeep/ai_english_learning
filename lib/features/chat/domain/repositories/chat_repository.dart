@@ -1,7 +1,10 @@
 import '../../../../shared/models/message_model.dart';
 import '../entities/conversation.dart';
+import '../../data/datasources/chat_remote_datasource.dart';
 
 abstract class ChatRepository {
+  // 提供对 remoteDataSource 的访问
+  ChatRemoteDataSource get remoteDataSource;
 
 
 

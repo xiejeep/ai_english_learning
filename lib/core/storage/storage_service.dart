@@ -184,6 +184,33 @@ class StorageService {
     return {};
   }
   
+  // Dify应用缓存相关
+  static Future<void> saveDifyAppsCache(List<Map<String, dynamic>> apps) async {
+    await _storage.write(AppConstants.difyAppsCacheKey, apps);
+    await _storage.write(AppConstants.difyAppsCacheTimeKey, DateTime.now().millisecondsSinceEpoch);
+  }
+  
+  static List<Map<String, dynamic>>? getDifyAppsCache() {
+    final data = _storage.read(AppConstants.difyAppsCacheKey);
+    if (data != null && data is List) {
+      return List<Map<String, dynamic>>.from(data);
+    }
+    return null;
+  }
+  
+  static DateTime? getDifyAppsCacheTime() {
+    final timestamp = _storage.read(AppConstants.difyAppsCacheTimeKey);
+    if (timestamp != null && timestamp is int) {
+      return DateTime.fromMillisecondsSinceEpoch(timestamp);
+    }
+    return null;
+  }
+  
+  static Future<void> clearDifyAppsCache() async {
+    await _storage.remove(AppConstants.difyAppsCacheKey);
+    await _storage.remove(AppConstants.difyAppsCacheTimeKey);
+  }
+  
   // 通用存储方法
   static Future<void> save<T>(String key, T value) async {
     await _storage.write(key, value);

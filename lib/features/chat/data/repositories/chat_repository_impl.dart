@@ -1,17 +1,18 @@
 import 'dart:async';
 import 'dart:math';
-import 'package:flutter/foundation.dart';
 import '../../domain/entities/conversation.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../datasources/chat_remote_datasource.dart';
 import '../models/conversation_model.dart';
 import '../../../../shared/models/message_model.dart';
 import '../../../../core/storage/storage_service.dart';
-import 'dart:math';
 class ChatRepositoryImpl implements ChatRepository {
   final ChatRemoteDataSource _remoteDataSource;
 
   ChatRepositoryImpl(this._remoteDataSource);
+  
+  // 提供对 remoteDataSource 的访问
+  ChatRemoteDataSource get remoteDataSource => _remoteDataSource;
 
   @override
   Stream<String> sendMessageStream({

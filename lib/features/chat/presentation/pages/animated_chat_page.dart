@@ -101,7 +101,13 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
     return AppBar(
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
-        onPressed: () {
+        onPressed: () async {
+          // 返回首页时停止播放音频
+          final chatState = ref.read(chatProvider);
+          if (chatState.isTTSPlaying || chatState.isTTSLoading) {
+            print('🛑 返回首页时停止TTS播放');
+            await ref.read(chatProvider.notifier).stopTTS();
+          }
           context.pop();
         },
       ),
@@ -305,6 +311,7 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
               onRetry: msg.status == MessageStatus.failed ? () => ref.read(chatProvider.notifier).retryMessage(msg.id) : null,
               isTTSLoading: state.isTTSLoading,
               isCurrentlyPlaying: state.isTTSPlaying,
+              isTTSCompleted: state.isTTSCompleted,
             ),
           );
         },

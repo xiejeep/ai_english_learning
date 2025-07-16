@@ -2,19 +2,20 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
-import 'playlist_tts_service.dart';
+import 'simple_tts_service.dart';
+import '../../features/chat/data/datasources/chat_remote_datasource.dart';
 
 /// 流式TTS音频服务
 /// 处理从流式响应中接收的Base64编码音频数据
-/// 现在使用 PlaylistTTSService 作为底层播放引擎
+/// 现在使用 SimpleTTSService 作为底层播放引擎
 class StreamTTSService {
   static StreamTTSService? _instance;
   static StreamTTSService get instance => _instance ??= StreamTTSService._();
   
   StreamTTSService._();
   
-  // 播放列表服务
-  final PlaylistTTSService _playlistService = PlaylistTTSService();
+  // 简化TTS服务
+  final SimpleTTSService _simpleTTSService = SimpleTTSService.instance;
   
   // 基础状态
   bool _isInitialized = false;
@@ -27,20 +28,35 @@ class StreamTTSService {
   Function(String)? _onError;
   
   /// 初始化服务
-  Future<void> initialize() async {
+  Future<void> initialize({ChatRemoteDataSource? chatRemoteDataSource}) async {
     if (_isInitialized) return;
     
     try {
-      // 初始化播放列表服务
-      await _playlistService.initialize();
+      // 初始化简化TTS服务
+      await _simpleTTSService.initialize();
       
-      // 设置播放列表服务的回调
-      _playlistService.setCallbacks(
-        onPlaybackStarted: () {
+      // 设置 ChatRemoteDataSource（如果提供）
+      if (chatRemoteDataSource != null) {
+        _simpleTTSService.setChatRemoteDataSource(chatRemoteDataSource);
+        print('✅ [StreamTTS] ChatRemoteDataSource 已设置');
+      } else {
+        // 尝试创建默认的 ChatRemoteDataSource 实例
+        try {
+          final defaultDataSource = ChatRemoteDataSource();
+          _simpleTTSService.setChatRemoteDataSource(defaultDataSource);
+          print('✅ [StreamTTS] 使用默认 ChatRemoteDataSource');
+        } catch (e) {
+          print('⚠️ [StreamTTS] 无法创建默认 ChatRemoteDataSource: $e');
+        }
+      }
+      
+      // 设置简化TTS服务的回调
+      _simpleTTSService.setCallbacks(
+        onStart: () {
           _onPlaybackStart?.call();
           print('🔊 [StreamTTS] 开始播放音频');
         },
-        onPlaybackCompleted: () {
+        onComplete: () {
           _onPlaybackComplete?.call();
           print('✅ [StreamTTS] 音频播放完成');
         },
@@ -93,17 +109,21 @@ class StreamTTSService {
   void setMessageText(String messageId, String messageText) {
     print('📝 [StreamTTS] 设置消息文本: $messageId');
     print('📝 [StreamTTS] 消息文本长度: ${messageText.length}');
-    print('📝 [StreamTTS] 消息文本预览: ${messageText.length > 50 ? messageText.substring(0, 50) + '...' : messageText}');
+    print('📝 [StreamTTS] 消息文本预览: ${messageText.length > 50 ? '${messageText.substring(0, 50)}...' : messageText}');
     
-    // 设置消息文本到播放列表服务
-    _playlistService.setMessageText(messageId, messageText);
-    print('✅ [StreamTTS] 消息文本已设置到播放列表服务');
+    // 设置消息文本到简化TTS服务
+    _simpleTTSService.setMessageText(messageId, messageText);
+    print('✅ [StreamTTS] 消息文本已设置到简化TTS服务');
   }
 
   /// 开始处理新的TTS消息
   void startTTSMessage(String messageId) {
     print('🎵 [StreamTTS] 开始处理TTS消息: $messageId');
     _currentMessageId = messageId;
+    
+    // 同时启动简化TTS服务的消息处理
+    _simpleTTSService.startTTSMessage(messageId);
+    print('✅ [StreamTTS] 已启动SimpleTTSService消息处理: $messageId');
   }
   
   /// 检查是否正在处理指定的消息ID
@@ -120,9 +140,9 @@ class StreamTTSService {
     
     try {
       if (base64Audio.isNotEmpty) {
-        // 直接使用播放列表服务处理音频块
-        _playlistService.processTTSChunk(messageId, base64Audio);
-        print('📦 [StreamTTS] 音频块已发送到播放列表服务');
+        // 直接使用简化TTS服务处理音频块
+        _simpleTTSService.processTTSChunk(messageId, base64Audio);
+        print('📦 [StreamTTS] 音频块已发送到简化TTS服务');
       }
     } catch (e) {
       print('❌ [StreamTTS] 处理音频块失败: $e');
@@ -145,10 +165,10 @@ class StreamTTSService {
     try {
       print('✅ [StreamTTS] 开始完成TTS消息: $messageId');
       
-      // 使用播放列表服务完成消息处理
-      print('📞 [StreamTTS] 调用PlaylistTTSService.finishTTSMessage');
-      await _playlistService.finishTTSMessage(messageId);
-      print('✅ [StreamTTS] PlaylistTTSService.finishTTSMessage 调用完成');
+      // 使用简化TTS服务完成消息处理
+      print('📞 [StreamTTS] 调用SimpleTTSService.finishTTSMessage');
+      await _simpleTTSService.finishTTSMessage(messageId);
+      print('✅ [StreamTTS] SimpleTTSService.finishTTSMessage 调用完成');
       
     } catch (e, stackTrace) {
       print('❌ [StreamTTS] 完成TTS消息失败: $e');
@@ -173,8 +193,8 @@ class StreamTTSService {
     }
     
     try {
-      // 使用播放列表服务播放缓存音频
-      await _playlistService.playMessageAudio(messageId);
+      // 使用简化TTS服务播放缓存音频
+      await _simpleTTSService.playMessageAudio(messageId);
     } catch (e) {
       print('❌ [StreamTTS] 播放缓存音频失败: $e');
       _onError?.call('播放失败: $e');
@@ -182,14 +202,14 @@ class StreamTTSService {
   }
   
   /// 根据消息内容播放缓存音频（新方法）
-  Future<void> playMessageAudioByContent(String messageContent) async {
+  Future<void> playMessageAudioByContent(String messageContent, {String? appId}) async {
     if (!_isInitialized) {
       await initialize();
     }
     
     try {
-      // 使用播放列表服务播放缓存音频（传入消息内容）
-      await _playlistService.playMessageAudio(messageContent);
+      // 使用简化TTS服务播放缓存音频（传入消息内容和appId）
+      await _simpleTTSService.playMessageAudio(messageContent, appId: appId);
     } catch (e) {
       print('❌ [StreamTTS] 播放缓存音频失败: $e');
       _onError?.call('播放失败: $e');
@@ -199,7 +219,7 @@ class StreamTTSService {
   /// 停止播放
   Future<void> stop() async {
     try {
-      await _playlistService.stop();
+      await _simpleTTSService.stop();
       _cleanup();
       print('🛑 [StreamTTS] 播放已停止');
     } catch (e) {
@@ -208,24 +228,24 @@ class StreamTTSService {
   }
   
   /// 检查是否正在播放
-  bool get isPlaying => _playlistService.isPlaying;
+  bool get isPlaying => _simpleTTSService.isPlaying;
   
   /// 检查是否已初始化
   bool get isInitialized => _isInitialized;
   
   /// 获取播放状态流
-  Stream<bool> get playingStream => _playlistService.playingStream;
+  Stream<bool> get playingStream => _simpleTTSService.playingStream;
   
   /// 获取播放进度流
-  Stream<Duration> get positionStream => _playlistService.positionStream;
+  Stream<Duration> get positionStream => _simpleTTSService.positionStream;
   
   /// 获取播放时长流
-  Stream<Duration?> get durationStream => _playlistService.durationStream;
+  Stream<Duration?> get durationStream => _simpleTTSService.durationStream;
   
   /// 清理缓存
   Future<void> clearCache() async {
     try {
-      await _playlistService.clearCache();
+      await _simpleTTSService.clearCache();
       
       // 清理本地缓存目录
       if (_cacheDir != null) {
@@ -248,7 +268,7 @@ class StreamTTSService {
   Future<void> dispose() async {
     try {
       await stop();
-      await _playlistService.dispose();
+      await _simpleTTSService.dispose();
       _isInitialized = false;
       _cleanup();
       _onPlaybackStart = null;

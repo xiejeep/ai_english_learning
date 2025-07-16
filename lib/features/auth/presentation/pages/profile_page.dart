@@ -13,7 +13,7 @@ final checkinStatusProvider = FutureProvider<CheckinStatus>((ref) async {
   final token = StorageService.getUserToken();
   print('[CheckinStatus] 获取签到状态, token: \\${token?.substring(0, 8) ?? 'null'}...');
   if (token == null) throw Exception('未登录，无法获取token');
-  final url = AppConstants.baseUrl + 'api/checkin/status';
+  const url = '${AppConstants.baseUrl}api/checkin/status';
   print('[CheckinStatus] 请求url: $url');
   try {
     final response = await dio.get(
@@ -84,7 +84,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     try {
       print('[Checkin] 发起签到请求, token: ${token.substring(0, 8)}...');
       final response = await dio.post(
-        AppConstants.baseUrl + 'api/checkin',
+        '${AppConstants.baseUrl}api/checkin',
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
       print('[Checkin] 签到响应: ${response.data}');
@@ -229,7 +229,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         Text(user?.email ?? '', style: const TextStyle(fontSize: 14, color: Colors.grey)),
                         if (user?.phone != null && user!.phone!.isNotEmpty) ...[
                           const SizedBox(height: 2),
-                          Text(user!.phone!, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                          Text(user.phone!, style: const TextStyle(fontSize: 14, color: Colors.grey)),
                         ],
                         const SizedBox(height: 4),
                         if (user != null)

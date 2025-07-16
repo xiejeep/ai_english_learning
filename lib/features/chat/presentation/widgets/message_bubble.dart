@@ -12,6 +12,7 @@ class MessageBubble extends StatelessWidget {
   final bool isTTSLoading;
   final bool isCurrentlyPlaying;
   final bool isTemporary;
+  final bool isTTSCompleted; // 新增TTS完成状态
 
   // 离线TTS实例（静态，避免重复初始化）
   static final FlutterTts _flutterTts = FlutterTts();
@@ -36,7 +37,7 @@ class MessageBubble extends StatelessWidget {
 
 
   const MessageBubble({
-    Key? key,
+    super.key,
     required this.message,
     this.onPlayTTS,
     this.onCopy,
@@ -44,7 +45,8 @@ class MessageBubble extends StatelessWidget {
     this.isTTSLoading = false,
     this.isCurrentlyPlaying = false,
     this.isTemporary = false,
-  }) : super(key: key);
+    this.isTTSCompleted = false, // 默认TTS未完成
+  });
 
   // TTS按钮图标逻辑
   IconData _getTTSButtonIcon() {
@@ -112,19 +114,19 @@ class MessageBubble extends StatelessWidget {
             },
             child: const Text('复制'),
           ),
-        // 朗读（仅在AI消息时显示）- 暂时注释以测试流式TTS
-        // if (!message.isUser)
-        //   TextButton(
-        //     onPressed: () {
-        //       // 关闭选择菜单
-        //       editableTextState.hideToolbar();
-        //       // 触发朗读
-        //       // 获取选中的文本
-        //       final selectedText = editableTextState.textEditingValue.selection.textInside(text);
-        //       speak(selectedText);
-        //     },
-        //     child: const Text('朗读'),
-        //   ),
+        // 朗读功能（支持选中文本朗读）
+        if (!isCollapsed)
+          TextButton(
+            onPressed: () {
+              // 关闭选择菜单
+              editableTextState.hideToolbar();
+              // 获取选中的文本
+              final selectedText = editableTextState.textEditingValue.selection.textInside(text);
+              // 触发朗读
+              speak(selectedText);
+            },
+            child: const Text('朗读'),
+          ),
         // 词典功能
         if (!isCollapsed)
           TextButton(
@@ -150,6 +152,7 @@ class MessageBubble extends StatelessWidget {
           child: SelectableText(
             text,
             style: TextStyle(color: textColor, fontSize: 16),
+            scrollPhysics: const NeverScrollableScrollPhysics(),
             contextMenuBuilder: (context, editableTextState) {
               return _buildCustomContextMenu(context, editableTextState, text);
             },
@@ -213,6 +216,7 @@ class MessageBubble extends StatelessWidget {
                           SelectableText(
                             message.content,
                             style: TextStyle(color: textColor, fontSize: 16),
+                            scrollPhysics: const NeverScrollableScrollPhysics(),
                             contextMenuBuilder: (context, editableTextState) {
                               return _buildCustomContextMenu(context, editableTextState, message.content);
                             },
@@ -257,7 +261,7 @@ class MessageBubble extends StatelessWidget {
             mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
             children: [
               const SizedBox(width: 30),
-              if (onPlayTTS != null && !hasError)
+              if (onPlayTTS != null && !hasError && message.isAI && (isTemporary ? isTTSCompleted : true))
                 IconButton(
                   icon: Icon(
                     _getTTSButtonIcon(),

@@ -49,6 +49,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
           print('⚠️ [STREAM TTS] TTS开始播放时刷新用户资料失败: $e');
         }
       },
+      onTTSCompleted: () {
+        state = state.copyWith(isTTSCompleted: true);
+        print('✅ [STREAM TTS] TTS已完成，isTTSCompleted=true');
+      },
     );
     _loadInitialData();
     _initStreamTTS();
@@ -103,6 +107,12 @@ class ChatNotifier extends StateNotifier<ChatState> {
   // 创建新会话（不预先生成ID，等待Dify返回）
   Future<void> createNewConversation() async {
     try {
+      // 停止当前播放的TTS音频
+      if (state.isTTSPlaying || state.isTTSLoading) {
+        print('🛑 新建会话时停止TTS播放');
+        await stopTTS();
+      }
+      
       // 创建一个临时会话，不生成本地ID
       final tempConversation = Conversation(
         id: "", // 空ID，等待Dify分配
@@ -359,7 +369,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
         (data) async{
           
           final event = data['event'] as String?;
-          print('收到事件:${event}');
           // 处理不同类型的事件
           if (event == 'message' || event == 'agent_message' || event == null) {
             // 处理普通消息事件
@@ -451,7 +460,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
               final messageText = fullResponse.isNotEmpty ? fullResponse : tempAiMessage.content;
               print('📝 [Chat Provider] 消息结束，设置消息文本: $originalMessageId');
               print('📝 [Chat Provider] 消息文本长度: ${messageText.length}');
-              print('📝 [Chat Provider] 消息文本预览: ${messageText.length > 50 ? messageText.substring(0, 50) + '...' : messageText}');
+              print('📝 [Chat Provider] 消息文本预览: ${messageText.length > 50 ? '${messageText.substring(0, 50)}...' : messageText}');
               
               // 设置消息文本到TTS事件处理器
               _ttsEventHandler.setMessageText(originalMessageId, messageText, _messageIdMappingService);
@@ -660,22 +669,25 @@ class ChatNotifier extends StateNotifier<ChatState> {
       
       print('📝 [STREAM TTS] 消息内容: ${message.content.substring(0, message.content.length > 50 ? 50 : message.content.length)}...');
       
-      // 设置加载状态
+      // 设置加载状态，重置完成状态
       state = state.copyWith(
         isTTSLoading: true,
         isTTSPlaying: false,
+        isTTSCompleted: false,
       );
       print('🔍 [STREAM TTS] TTS加载开始: isTTSLoading=true');
       
       // 确保流式TTS服务已初始化
       if (!StreamTTSService.instance.isInitialized) {
         print('🔧 [STREAM TTS] 服务未初始化，正在初始化...');
-        await StreamTTSService.instance.initialize();
+        // 传入 ChatRemoteDataSource 实例以支持音频重新获取
+        final chatRemoteDataSource = _repository.remoteDataSource;
+        await StreamTTSService.instance.initialize(chatRemoteDataSource: chatRemoteDataSource);
       }
       
-      // 使用消息内容播放音频（缓存是基于内容的）
-      await StreamTTSService.instance.playMessageAudioByContent(message.content);
-      print('🎯 [STREAM TTS] 使用消息内容播放: $messageId');
+      // 使用消息内容播放音频（缓存是基于内容的），传递appId
+      await StreamTTSService.instance.playMessageAudioByContent(message.content, appId: state.appId);
+      print('🎯 [STREAM TTS] 使用消息内容播放: $messageId, appId: ${state.appId}');
       
       print('🎯 [STREAM TTS] 消息音频播放启动成功');
     } catch (e) {
@@ -685,6 +697,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       state = state.copyWith(
         isTTSLoading: false,
         isTTSPlaying: false,
+        isTTSCompleted: false,
       );
     }
   }
@@ -712,6 +725,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       state = state.copyWith(
         isTTSLoading: false,
         isTTSPlaying: false,
+        isTTSCompleted: false,
       );
       print('✅ [STREAM TTS] TTS状态已清除');
     } catch (e) {
@@ -720,6 +734,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       state = state.copyWith(
         isTTSLoading: false,
         isTTSPlaying: false,
+        isTTSCompleted: false,
       );
     }
   }

@@ -337,7 +337,7 @@ class TTSCacheService {
       
       // 检查缓存大小
       final totalSize = await _calculateCacheSize();
-      final maxSizeBytes = maxCacheSizeMB * 1024 * 1024;
+      const maxSizeBytes = maxCacheSizeMB * 1024 * 1024;
       
       if (totalSize > maxSizeBytes) {
         await _cleanupBySize(maxSizeBytes);

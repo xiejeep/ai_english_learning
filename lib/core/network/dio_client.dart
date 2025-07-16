@@ -49,7 +49,7 @@ class DioClient {
         if (options.data != null) {
           print('📦 Body: ${options.data}');
         }
-        if (options.queryParameters != null && options.queryParameters!.isNotEmpty) {
+        if (options.queryParameters.isNotEmpty) {
           print('🔍 Query: ${options.queryParameters}');
         }
         

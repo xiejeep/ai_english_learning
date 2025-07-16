@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_constants.dart';
 
 class MessageInput extends StatefulWidget {
   final TextEditingController controller;
@@ -93,7 +92,7 @@ class _MessageInputState extends State<MessageInput> {
                   maxHeight: 120,
                 ),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                  color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
                     color: theme.colorScheme.outline.withOpacity(0.3),

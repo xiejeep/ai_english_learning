@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../../../core/network/dio_client.dart';
@@ -93,9 +92,7 @@ class ChatRemoteDataSource {
               final json = jsonDecode(data);
               
               // 获取会话ID（如果这是新创建的会话）
-              if (detectedConversationId == null) {
-                detectedConversationId = json['conversation_id'] as String?;
-              }
+              detectedConversationId ??= json['conversation_id'] as String?;
               
               // 根据事件类型处理不同的响应
               final event = json['event'] as String?;
@@ -159,9 +156,7 @@ class ChatRemoteDataSource {
             final json = jsonDecode(data);
             
             // 获取会话ID（如果这是新创建的会话）
-            if (detectedConversationId == null) {
-              detectedConversationId = json['conversation_id'] as String?;
-            }
+            detectedConversationId ??= json['conversation_id'] as String?;
             
             final event = json['event'] as String?;
             if (event == 'message' || event == 'agent_message') {
@@ -239,7 +234,7 @@ class ChatRemoteDataSource {
   // 获取TTS音频（直接接收二进制数据）
   Future<String> getTTSAudio(String text, {String? appId}) async {
     try {
-      print('开始获取TTS音频: "${text.length > 50 ? text.substring(0, 50) + "..." : text}"');
+      print('开始获取TTS音频: "${text.length > 50 ? "${text.substring(0, 50)}..." : text}"');
       
       final Map<String, dynamic> requestData = {
         'text': text,

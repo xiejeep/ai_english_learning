@@ -25,6 +25,7 @@ class ChatState {
   // TTS状态：简化为只需要加载状态和播放状态
   final bool isTTSLoading;
   final bool isTTSPlaying;
+  final bool isTTSCompleted; // TTS是否已完成
   // 当前选择的Dify应用ID
   final String? appId;
   final String? appName;
@@ -42,6 +43,7 @@ class ChatState {
     this.firstId,
     this.isTTSLoading = false,
     this.isTTSPlaying = false,
+    this.isTTSCompleted = false,
     this.appId,
     this.appName,
   });
@@ -59,6 +61,7 @@ class ChatState {
     String? firstId,
     bool? isTTSLoading,
     bool? isTTSPlaying,
+    bool? isTTSCompleted,
     String? appId,
     String? appName,
   }) {
@@ -75,6 +78,7 @@ class ChatState {
       firstId: firstId ?? this.firstId,
       isTTSLoading: isTTSLoading ?? this.isTTSLoading,
       isTTSPlaying: isTTSPlaying ?? this.isTTSPlaying,
+      isTTSCompleted: isTTSCompleted ?? this.isTTSCompleted,
       appId: appId ?? this.appId,
       appName: appName ?? this.appName,
     );
@@ -156,6 +160,7 @@ class ChatState {
         other.firstId == firstId &&
         other.isTTSLoading == isTTSLoading &&
         other.isTTSPlaying == isTTSPlaying &&
+        other.isTTSCompleted == isTTSCompleted &&
         other.appId == appId &&
         other.appName == appName;
   }
@@ -174,6 +179,7 @@ class ChatState {
         firstId.hashCode ^
         isTTSLoading.hashCode ^
         isTTSPlaying.hashCode ^
+        isTTSCompleted.hashCode ^
         appId.hashCode ^
         appName.hashCode;
   }

@@ -3,6 +3,7 @@ import 'package:ai_english_learning/features/auth/presentation/pages/token_histo
 import 'package:ai_english_learning/features/auth/presentation/pages/credits_history_page.dart';
 import 'package:ai_english_learning/features/auth/presentation/pages/settings_page.dart';
 import 'package:ai_english_learning/features/dictionary/presentation/pages/dictionary_page.dart';
+import 'package:ai_english_learning/features/about/presentation/pages/about_page.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
@@ -71,6 +72,10 @@ class AppRouter {
           final word = state.uri.queryParameters['word'] ?? '';
           return DictionaryPage(word: word);
         },
+      ),
+      GoRoute(
+        path: AppConstants.aboutRoute,
+        builder: (context, state) => const AboutPage(),
       ),
     ],
   );

@@ -34,10 +34,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final loginFormNotifier = ref.read(loginFormProvider.notifier);
     
     // 加载记住账号状态
-    final rememberAccount = await StorageService.getRememberAccount();
+    final rememberAccount = StorageService.getRememberAccount();
     
     // 加载最后登录的邮箱
-    final lastEmail = await StorageService.getLastLoginEmail();
+    final lastEmail = StorageService.getLastLoginEmail();
     
     setState(() {
       _rememberAccount = rememberAccount;

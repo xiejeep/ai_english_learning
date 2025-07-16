@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:ai_english_learning/core/services/stream_tts_service.dart';
 import 'package:ai_english_learning/core/services/message_id_mapping_service.dart';
@@ -9,10 +7,12 @@ import 'package:ai_english_learning/core/services/message_id_mapping_service.dar
 class TTSEventHandler {
   final Function(bool isLoading, bool isPlaying)? onStateUpdate;
   final VoidCallback? onUserProfileRefresh;
+  final VoidCallback? onTTSCompleted;
 
   TTSEventHandler({
     this.onStateUpdate,
     this.onUserProfileRefresh,
+    this.onTTSCompleted,
   });
 
   /// 初始化TTS事件处理器
@@ -53,7 +53,7 @@ class TTSEventHandler {
       if (localMessageId != null) {
         print('📝 [TTS Event] 设置消息文本: $serverMessageId -> $localMessageId');
         print('📝 [TTS Event] 消息文本长度: ${messageText.length}');
-        print('📝 [TTS Event] 消息文本预览: ${messageText.length > 50 ? messageText.substring(0, 50) + '...' : messageText}');
+        print('📝 [TTS Event] 消息文本预览: ${messageText.length > 50 ? '${messageText.substring(0, 50)}...' : messageText}');
         
         // 使用localMessageId设置消息文本到StreamTTSService
         StreamTTSService.instance.setMessageText(localMessageId, messageText);
@@ -117,6 +117,10 @@ class TTSEventHandler {
         print('✅ [TTS Event] 调用StreamTTSService.finishTTSMessage: $localMessageId');
         await StreamTTSService.instance.finishTTSMessage(localMessageId);
         print('🏁 [TTS Event] 处理TTS消息结束: $serverMessageId -> $localMessageId');
+        
+        // 通知TTS已完成
+        onTTSCompleted?.call();
+        print('✅ [TTS Event] TTS完成状态已通知');
       } else {
         print('❌ [TTS Event] 本地消息ID为空，无法完成TTS消息处理');
         print('⚠️ [TTS Event] 未找到本地消息ID映射: $serverMessageId');

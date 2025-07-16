@@ -14,42 +14,8 @@ class SettingsPage extends ConsumerStatefulWidget {
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _isClearing = false;
-  String _cacheSize = '计算中...';
 
-  @override
-  void initState() {
-    super.initState();
-    _calculateCacheSize();
-  }
 
-  Future<void> _calculateCacheSize() async {
-    try {
-      final tempDir = await getTemporaryDirectory();
-      final audioDir = Directory('${tempDir.path}/audio_cache');
-      
-      if (await audioDir.exists()) {
-        int totalSize = 0;
-        await for (final entity in audioDir.list(recursive: true)) {
-          if (entity is File) {
-            final stat = await entity.stat();
-            totalSize += stat.size;
-          }
-        }
-        
-        setState(() {
-          _cacheSize = _formatBytes(totalSize);
-        });
-      } else {
-        setState(() {
-          _cacheSize = '0 B';
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _cacheSize = '计算失败';
-      });
-    }
-  }
 
   String _formatBytes(int bytes) {
     if (bytes <= 0) return '0 B';
@@ -71,12 +37,37 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     });
 
     try {
-      final tempDir = await getTemporaryDirectory();
-      final audioDir = Directory('${tempDir.path}/audio_cache');
+      bool hasCache = false;
       
-      if (await audioDir.exists()) {
-        await audioDir.delete(recursive: true);
-        
+      // 获取应用文档目录
+      final appDir = await getApplicationDocumentsDirectory();
+      
+      // 清除 TTSCacheService 的缓存目录
+      final ttsCacheDir = Directory('${appDir.path}/tts_cache');
+      if (await ttsCacheDir.exists()) {
+        await ttsCacheDir.delete(recursive: true);
+        hasCache = true;
+        print('🗑️ 已清除 TTS 缓存目录');
+      }
+      
+      // 清除 SimpleTTSService 的缓存目录
+      final simpleTtsCacheDir = Directory('${appDir.path}/simple_tts_cache');
+      if (await simpleTtsCacheDir.exists()) {
+        await simpleTtsCacheDir.delete(recursive: true);
+        hasCache = true;
+        print('🗑️ 已清除 Simple TTS 缓存目录');
+      }
+      
+      // 清除临时目录中的 simple_tts 目录
+      final tempDir = await getTemporaryDirectory();
+      final tempTtsDir = Directory('${tempDir.path}/simple_tts');
+      if (await tempTtsDir.exists()) {
+        await tempTtsDir.delete(recursive: true);
+        hasCache = true;
+        print('🗑️ 已清除临时 TTS 目录');
+      }
+      
+      if (hasCache) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -98,9 +89,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         }
       }
       
-      // 重新计算缓存大小
-      await _calculateCacheSize();
+
     } catch (e) {
+      print('❌ 清除缓存失败: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -117,40 +108,105 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
-  void _showClearCacheDialog() {
+  void _showClearCacheDialog() async {
+    // 先计算缓存大小
+    String cacheSize = '计算中...';
+    
+    // 显示对话框
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('清除音频缓存'),
-          content: Text('确定要清除所有音频缓存文件吗？\n\n当前缓存大小: $_cacheSize'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('取消'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _clearAudioCache();
-              },
-              child: const Text(
-                '确定',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setState) {
+            // 异步计算缓存大小
+            if (cacheSize == '计算中...') {
+              _calculateCacheSizeForDialog().then((size) {
+                setState(() {
+                  cacheSize = size;
+                });
+              });
+            }
+            
+            return AlertDialog(
+              title: const Text('清除音频缓存'),
+              content: Text('确定要清除所有音频缓存文件吗？\n\n当前缓存大小: $cacheSize'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('取消'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _clearAudioCache();
+                  },
+                  child: const Text(
+                    '确定',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );
+  }
+
+  Future<String> _calculateCacheSizeForDialog() async {
+    try {
+      int totalSize = 0;
+      
+      // 获取应用文档目录
+      final appDir = await getApplicationDocumentsDirectory();
+      
+      // 检查 TTSCacheService 的缓存目录
+      final ttsCacheDir = Directory('${appDir.path}/tts_cache');
+      if (await ttsCacheDir.exists()) {
+        await for (final entity in ttsCacheDir.list(recursive: true)) {
+          if (entity is File) {
+            final stat = await entity.stat();
+            totalSize += stat.size;
+          }
+        }
+      }
+      
+      // 检查 SimpleTTSService 的缓存目录
+      final simpleTtsCacheDir = Directory('${appDir.path}/simple_tts_cache');
+      if (await simpleTtsCacheDir.exists()) {
+        await for (final entity in simpleTtsCacheDir.list(recursive: true)) {
+          if (entity is File) {
+            final stat = await entity.stat();
+            totalSize += stat.size;
+          }
+        }
+      }
+      
+      // 检查临时目录中的 simple_tts 目录
+      final tempDir = await getTemporaryDirectory();
+      final tempTtsDir = Directory('${tempDir.path}/simple_tts');
+      if (await tempTtsDir.exists()) {
+        await for (final entity in tempTtsDir.list(recursive: true)) {
+          if (entity is File) {
+            final stat = await entity.stat();
+            totalSize += stat.size;
+          }
+        }
+      }
+      
+      return _formatBytes(totalSize);
+    } catch (e) {
+      print('❌ 计算缓存大小失败: $e');
+      return '计算失败';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('设置'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: const Text('设置'),backgroundColor: Theme.of(context).primaryColor,
+        foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -179,19 +235,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     Icons.audiotrack,
                     color: Theme.of(context).primaryColor,
                   ),
-                  title: const Text('音频缓存'),
-                  subtitle: Text('当前大小: $_cacheSize'),
+                  title: const Text('清理缓存'),
+                  subtitle: const Text('清理音频缓存文件'),
                   trailing: _isClearing
                       ? const SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: _showClearCacheDialog,
-                          tooltip: '清除音频缓存',
-                        ),
+                      : const Icon(Icons.chevron_right),
+                  onTap: _isClearing ? null : _showClearCacheDialog,
                 ),
               ],
             ),
@@ -229,6 +282,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ),
                   title: const Text('应用名称'),
                   subtitle: const Text(AppConstants.appName),
+                ),
+                ListTile(
+                  leading: Icon(
+                    Icons.help_outline,
+                    color: Theme.of(context).primaryColor,
+                  ),
+                  title: const Text('关于我们'),
+                  subtitle: const Text('了解更多应用信息'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push(AppConstants.aboutRoute),
                 ),
               ],
             ),

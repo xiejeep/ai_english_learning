@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/chat_provider.dart';
-import '../providers/chat_state.dart';
 import '../providers/conversation_list_provider.dart';
 import '../../domain/entities/conversation.dart';
-import '../../../../core/constants/app_constants.dart';
 import '../../../auth/presentation/providers/user_profile_provider.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
-import 'package:go_router/go_router.dart';
 
 class ConversationDrawer extends ConsumerStatefulWidget {
   const ConversationDrawer({super.key});
@@ -122,7 +118,7 @@ class _ConversationDrawerState extends ConsumerState<ConversationDrawer> {
                   final userProfileAsync = ref.watch(userProfileProvider);
                   return userProfileAsync.when(
                     loading: () => const Text('Token余额加载中...', style: TextStyle(fontSize: 12, color: Colors.white70)),
-                    error: (e, _) => Text('Token余额加载失败', style: const TextStyle(fontSize: 12, color: Colors.redAccent)),
+                    error: (e, _) => const Text('Token余额加载失败', style: TextStyle(fontSize: 12, color: Colors.redAccent)),
                     data: (profile) => Text('当前Token余额：${profile.tokenBalance}', style: const TextStyle(fontSize: 12, color: Colors.white)),
                   );
                 },

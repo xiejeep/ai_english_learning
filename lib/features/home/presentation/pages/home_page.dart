@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -7,11 +8,18 @@ import '../../../auth/presentation/providers/auth_state.dart';
 import '../providers/dify_apps_provider.dart';
 import '../../../../shared/models/dify_app_model.dart';
 
-class HomePage extends ConsumerWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends ConsumerState<HomePage> {
+  DateTime? _lastPressedAt;
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final difyAppsState = ref.watch(difyAppsProvider);
     
@@ -38,13 +46,13 @@ class HomePage extends ConsumerWidget {
       }
       
       // 处理认证成功时加载应用列表
-      // 重要：无论之前的状态如何，只要检测到登录成功，就强制重新加载应用列表
+      // 重要：检测到登录成功时，优先使用缓存数据，然后在后台更新
       if (previous != null && 
           !previous.isAuthenticated && 
           next.isAuthenticated) {
-        print('✅ [HomePage] 检测到登录成功，强制重新加载应用列表');
-        // 使用 forceRefresh 确保完全重置状态并重新加载
-        ref.read(difyAppsProvider.notifier).forceRefresh();
+        print('✅ [HomePage] 检测到登录成功，加载应用列表（优先使用缓存）');
+        // 使用 loadDifyApps 优先展示缓存数据，然后后台更新
+        ref.read(difyAppsProvider.notifier).loadDifyApps();
       }
     });
     
@@ -82,15 +90,21 @@ class HomePage extends ConsumerWidget {
           if (!currentDifyAppsState.hasLoaded || 
               currentDifyAppsState.errorMessage != null ||
               currentDifyAppsState.apps.isEmpty) {
-            print('✅ [HomePage] 首次加载：用户已认证，开始加载应用列表');
-            ref.read(difyAppsProvider.notifier).forceRefresh();
+            print('✅ [HomePage] 首次加载：用户已认证，开始加载应用列表（优先使用缓存）');
+            ref.read(difyAppsProvider.notifier).loadDifyApps();
           }
         }
       });
     }
 
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBackPress();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('趣TALK伙伴'),
         backgroundColor: Theme.of(context).primaryColor,
@@ -125,6 +139,7 @@ class HomePage extends ConsumerWidget {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -152,18 +167,18 @@ class HomePage extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.waving_hand,
                 color: Colors.white,
                 size: 28,
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: Text(
                   '欢迎回来！',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -181,9 +196,9 @@ class HomePage extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Text(
+          const Text(
             '开始您的英语学习之旅吧！',
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
               fontSize: 16,
             ),
@@ -427,5 +442,26 @@ class HomePage extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  void _handleBackPress() {
+    final now = DateTime.now();
+    
+    if (_lastPressedAt == null || 
+        now.difference(_lastPressedAt!) > const Duration(milliseconds: 1000)) {
+      // 第一次按返回键或超过1000毫秒，显示提示并重新计时
+      _lastPressedAt = now;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('再次点击返回键退出应用'),
+          duration: Duration(milliseconds: 1500),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      // 300毫秒内再次按返回键，退出应用
+      SystemNavigator.pop();
+    }
   }
 }

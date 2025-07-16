@@ -45,7 +45,7 @@ class UserProfileNotifier extends StateNotifier<AsyncValue<UserProfile>> {
       print('[UserProfile] 查询用户完整信息, token: ${token?.substring(0, 8) ?? 'null'}...');
       if (token == null) throw Exception('未登录，无法获取用户信息');
       
-      final url = AppConstants.baseUrl + 'api/user/profile';
+      const url = '${AppConstants.baseUrl}api/user/profile';
       print('[UserProfile] 请求url: $url');
       
       final response = await dio.get(

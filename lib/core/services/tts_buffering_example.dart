@@ -54,7 +54,7 @@ class TTSBufferingExample {
       await _ttsService.processTTSChunk(messageId, audioChunks[i]);
       
       // 模拟网络延迟
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 100));
       
       print('📥 已处理音频块 ${i + 1}/${audioChunks.length}');
     }

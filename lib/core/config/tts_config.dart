@@ -66,7 +66,7 @@ class TTSConfig {
   // ========== 播放策略配置 ==========
   
   /// 当前播放策略
-  PlaybackStrategy _playbackStrategy = PlaybackStrategy.smart;
+  PlaybackStrategy _playbackStrategy = PlaybackStrategy.buffered;
   PlaybackStrategy get playbackStrategy => _playbackStrategy;
   
   /// 设置播放策略
@@ -96,7 +96,7 @@ class TTSConfig {
   int get cacheExpirationHours => 24;
   
   /// 最大缓存大小（MB）
-  int get maxCacheSizeMB => 50;
+  int get maxCacheSizeMB => 100;
   
   /// 是否启用缓存
   bool _cacheEnabled = true;
@@ -122,16 +122,16 @@ class TTSConfig {
   // ========== 音频合并配置 ==========
   
   /// 每个播放段包含的音频块数量（用于减少播放卡顿）
-  int _chunksPerSegment = 10;
+  int _chunksPerSegment = 20;
   int get chunksPerSegment => _chunksPerSegment;
   
   /// 设置每个段的音频块数量
   void setChunksPerSegment(int count) {
-    if (count > 0 && count <= 20) {
+    if (count > 0 && count <= 30) {
       _chunksPerSegment = count;
       print('🔧 [TTS Config] 每段音频块数量已设置为: $count');
     } else {
-      print('⚠️ [TTS Config] 无效的音频块数量: $count (范围: 1-20)');
+      print('⚠️ [TTS Config] 无效的音频块数量: $count (范围: 1-30)');
     }
   }
   
@@ -146,7 +146,7 @@ class TTSConfig {
   }
   
   /// 第一段的特殊处理（减少初始延迟）
-  bool _fastFirstSegment = false; // 改为false，确保所有段都按照chunksPerSegment合并
+  bool _fastFirstSegment = false; // 启用第一段快速播放，减少初始延迟
   bool get fastFirstSegment => _fastFirstSegment;
   
   /// 设置第一段快速播放
