@@ -1,17 +1,8 @@
 import 'package:flutter/material.dart';
 
-enum MessageType {
-  user,
-  ai,
-  system,
-}
+enum MessageType { user, ai, system }
 
-enum MessageStatus {
-  sending,
-  sent,
-  failed,
-  received,
-}
+enum MessageStatus { sending, sent, failed, received }
 
 class MessageModel {
   final String id;
@@ -20,7 +11,7 @@ class MessageModel {
   final MessageStatus status;
   final DateTime timestamp;
   final String? conversationId;
-  
+
   // AI回复的额外信息
   final String? correction; // 语法纠错
   final String? translation; // 翻译
@@ -30,7 +21,7 @@ class MessageModel {
   final List<InlineSpan>? richContent;
   // 新增：错误信息（用于显示发送失败的详细原因）
   final String? errorMessage;
-  
+
   const MessageModel({
     required this.id,
     required this.content,
@@ -45,7 +36,7 @@ class MessageModel {
     this.richContent,
     this.errorMessage,
   });
-  
+
   // 从JSON创建对象
   factory MessageModel.fromJson(Map<String, dynamic> json) {
     return MessageModel(
@@ -69,7 +60,7 @@ class MessageModel {
       errorMessage: json['error_message'] as String?,
     );
   }
-  
+
   // 转换为JSON
   Map<String, dynamic> toJson() {
     return {
@@ -86,7 +77,7 @@ class MessageModel {
       'error_message': errorMessage,
     };
   }
-  
+
   // 复制对象并修改部分字段
   MessageModel copyWith({
     String? id,
@@ -117,32 +108,32 @@ class MessageModel {
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }
-  
+
   // 判断是否为用户消息
   bool get isUser => type == MessageType.user;
-  
+
   // 判断是否为AI消息
   bool get isAI => type == MessageType.ai;
-  
+
   // 判断是否有语法纠错
   bool get hasCorrection => correction != null && correction!.isNotEmpty;
-  
+
   // 判断是否有翻译
   bool get hasTranslation => translation != null && translation!.isNotEmpty;
-  
+
   // 判断是否有建议
   bool get hasSuggestion => suggestion != null && suggestion!.isNotEmpty;
-  
+
   // 判断是否有音频
   bool get hasAudio => audioUrl != null && audioUrl!.isNotEmpty;
-  
+
   // 判断是否有错误信息
   bool get hasError => errorMessage != null && errorMessage!.isNotEmpty;
-  
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    
+
     return other is MessageModel &&
         other.id == id &&
         other.content == content &&
@@ -156,7 +147,7 @@ class MessageModel {
         other.audioUrl == audioUrl &&
         other.errorMessage == errorMessage;
   }
-  
+
   @override
   int get hashCode {
     return id.hashCode ^
@@ -171,7 +162,7 @@ class MessageModel {
         audioUrl.hashCode ^
         errorMessage.hashCode;
   }
-  
+
   @override
   String toString() {
     return 'MessageModel(id: $id, content: $content, type: $type, status: $status, timestamp: $timestamp, conversationId: $conversationId, correction: $correction, translation: $translation, suggestion: $suggestion, audioUrl: $audioUrl, errorMessage: $errorMessage)';

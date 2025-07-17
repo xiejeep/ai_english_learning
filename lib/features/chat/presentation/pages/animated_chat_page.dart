@@ -14,6 +14,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/providers/auth_state.dart';
 import '../../../../shared/models/message_model.dart';
+import '../../../../core/storage/storage_service.dart';
 
 class AnimatedChatPage extends ConsumerStatefulWidget {
   final String? type;
@@ -226,6 +227,13 @@ class _ChatContent extends ConsumerStatefulWidget {
 class _ChatContentState extends ConsumerState<_ChatContent> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  Map<String, dynamic> _bubbleSettings = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _bubbleSettings = StorageService.getChatBubbleSettings();
+  }
 
   @override
   void dispose() {
@@ -323,6 +331,11 @@ class _ChatContentState extends ConsumerState<_ChatContent> {
               isTTSLoading: state.isTTSLoading,
               isCurrentlyPlaying: state.isTTSPlaying,
               isTTSCompleted: state.isTTSCompleted,
+              userBubbleColor: _bubbleSettings['userBubbleColor'] != null ? Color(_bubbleSettings['userBubbleColor']) : null,
+              aiBubbleColor: _bubbleSettings['aiBubbleColor'] != null ? Color(_bubbleSettings['aiBubbleColor']) : null,
+              userTextColor: _bubbleSettings['userTextColor'] != null ? Color(_bubbleSettings['userTextColor']) : null,
+              aiTextColor: _bubbleSettings['aiTextColor'] != null ? Color(_bubbleSettings['aiTextColor']) : null,
+              bubbleOpacity: _bubbleSettings['opacity'] != null ? (_bubbleSettings['opacity'] as num).toDouble() : null,
             ),
           );
         },
@@ -370,24 +383,7 @@ class _ChatContentState extends ConsumerState<_ChatContent> {
                 ),
                 const SizedBox(height: 24),
               ] else ...[
-                Text(
-                  '开始你的英语学习之旅',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '输入任何你想练习的内容\nAI助手会帮你纠错、翻译和提供学习建议,可以是中文、英文,也可以中英混杂',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey.shade600,
-                    height: 1.4,
-                  ),
-                ),
+                _buildWelcomeBubble(),
                 const SizedBox(height: 32),
               ],
               _buildSuggestedPrompts(),
@@ -395,6 +391,31 @@ class _ChatContentState extends ConsumerState<_ChatContent> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildWelcomeBubble() {
+    // 创建一个模拟的欢迎消息
+    final welcomeMessage = MessageModel(
+      id: 'welcome_message',
+      content:
+          '👋 欢迎来到英语学习助手！\n\n我可以帮你：\n• 纠正语法错误\n• 翻译中英文\n• 提供学习建议\n• 练习对话\n\n你可以用中文、英文或中英混合的方式与我交流，让我们开始你的英语学习之旅吧！',
+      type: MessageType.ai,
+      timestamp: DateTime.now(),
+      status: MessageStatus.sent,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: MessageBubble(
+        message: welcomeMessage,
+        isTemporary: false,
+        onPlayTTS: null, // 欢迎消息不需要TTS功能
+        onCopy: () => _copyMessageToClipboard(welcomeMessage.content),
+        isTTSLoading: false,
+        isCurrentlyPlaying: false,
+        isTTSCompleted: false,
+      ),
     );
   }
 
@@ -406,12 +427,13 @@ class _ChatContentState extends ConsumerState<_ChatContent> {
     ];
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           '试试这些话题：',
           style: TextStyle(
             fontSize: 14,
-            color: Colors.grey.shade600,
+            color: Colors.grey.shade300,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -419,6 +441,7 @@ class _ChatContentState extends ConsumerState<_ChatContent> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
+          alignment: WrapAlignment.start,
           children:
               prompts.map((prompt) {
                 return ActionChip(

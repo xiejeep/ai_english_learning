@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/storage/storage_service.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -13,21 +14,25 @@ class SettingsPage extends ConsumerStatefulWidget {
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
+  // 移除：气泡样式相关变量、方法、UI，只保留主题管理入口
   bool _isClearing = false;
 
+  @override
+  void initState() {
+    super.initState();
+  }
 
 
+  // 缓存管理相关方法
   String _formatBytes(int bytes) {
     if (bytes <= 0) return '0 B';
     const suffixes = ['B', 'KB', 'MB', 'GB'];
     int i = 0;
     double size = bytes.toDouble();
-    
     while (size >= 1024 && i < suffixes.length - 1) {
       size /= 1024;
       i++;
     }
-    
     return '${size.toStringAsFixed(1)} ${suffixes[i]}';
   }
 
@@ -35,38 +40,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     setState(() {
       _isClearing = true;
     });
-
     try {
       bool hasCache = false;
-      
-      // 获取应用文档目录
       final appDir = await getApplicationDocumentsDirectory();
-      
-      // 清除 TTSCacheService 的缓存目录
       final ttsCacheDir = Directory('${appDir.path}/tts_cache');
       if (await ttsCacheDir.exists()) {
         await ttsCacheDir.delete(recursive: true);
         hasCache = true;
-        print('🗑️ 已清除 TTS 缓存目录');
       }
-      
-      // 清除 SimpleTTSService 的缓存目录
       final simpleTtsCacheDir = Directory('${appDir.path}/simple_tts_cache');
       if (await simpleTtsCacheDir.exists()) {
         await simpleTtsCacheDir.delete(recursive: true);
         hasCache = true;
-        print('🗑️ 已清除 Simple TTS 缓存目录');
       }
-      
-      // 清除临时目录中的 simple_tts 目录
       final tempDir = await getTemporaryDirectory();
       final tempTtsDir = Directory('${tempDir.path}/simple_tts');
       if (await tempTtsDir.exists()) {
         await tempTtsDir.delete(recursive: true);
         hasCache = true;
-        print('🗑️ 已清除临时 TTS 目录');
       }
-      
       if (hasCache) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -88,10 +80,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           );
         }
       }
-      
-
     } catch (e) {
-      print('❌ 清除缓存失败: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -109,16 +98,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   void _showClearCacheDialog() async {
-    // 先计算缓存大小
     String cacheSize = '计算中...';
-    
-    // 显示对话框
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setState) {
-            // 异步计算缓存大小
             if (cacheSize == '计算中...') {
               _calculateCacheSizeForDialog().then((size) {
                 setState(() {
@@ -126,7 +111,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 });
               });
             }
-            
             return AlertDialog(
               title: const Text('清除音频缓存'),
               content: Text('确定要清除所有音频缓存文件吗？\n\n当前缓存大小: $cacheSize'),
@@ -156,11 +140,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Future<String> _calculateCacheSizeForDialog() async {
     try {
       int totalSize = 0;
-      
-      // 获取应用文档目录
       final appDir = await getApplicationDocumentsDirectory();
-      
-      // 检查 TTSCacheService 的缓存目录
       final ttsCacheDir = Directory('${appDir.path}/tts_cache');
       if (await ttsCacheDir.exists()) {
         await for (final entity in ttsCacheDir.list(recursive: true)) {
@@ -170,8 +150,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           }
         }
       }
-      
-      // 检查 SimpleTTSService 的缓存目录
       final simpleTtsCacheDir = Directory('${appDir.path}/simple_tts_cache');
       if (await simpleTtsCacheDir.exists()) {
         await for (final entity in simpleTtsCacheDir.list(recursive: true)) {
@@ -181,8 +159,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           }
         }
       }
-      
-      // 检查临时目录中的 simple_tts 目录
       final tempDir = await getTemporaryDirectory();
       final tempTtsDir = Directory('${tempDir.path}/simple_tts');
       if (await tempTtsDir.exists()) {
@@ -193,10 +169,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           }
         }
       }
-      
       return _formatBytes(totalSize);
     } catch (e) {
-      print('❌ 计算缓存大小失败: $e');
       return '计算失败';
     }
   }
@@ -215,6 +189,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // 主题管理入口
+          Card(
+            child: ListTile(
+              leading: Icon(Icons.color_lens, color: Theme.of(context).primaryColor),
+              title: const Text('主题与气泡样式'),
+              subtitle: const Text('自定义主题色、聊天气泡颜色、文字颜色等'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/theme-settings'),
+            ),
+          ),
+          const SizedBox(height: 16),
           // 缓存管理部分
           Card(
             child: Column(

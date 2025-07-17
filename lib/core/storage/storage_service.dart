@@ -184,6 +184,26 @@ class StorageService {
     return {};
   }
   
+  // 聊天气泡样式设置
+  static Future<void> saveChatBubbleSettings(Map<String, dynamic> settings) async {
+    final appSettings = getAppSettings();
+    appSettings[AppConstants.chatBubbleSettingsKey] = settings;
+    await saveAppSettings(appSettings);
+  }
+
+  static Map<String, dynamic> getChatBubbleSettings() {
+    final appSettings = getAppSettings();
+    if (appSettings.containsKey(AppConstants.chatBubbleSettingsKey)) {
+      final data = appSettings[AppConstants.chatBubbleSettingsKey];
+      if (data is Map<String, dynamic>) {
+        return data;
+      } else if (data is Map) {
+        return Map<String, dynamic>.from(data);
+      }
+    }
+    return {};
+  }
+  
   // Dify应用缓存相关
   static Future<void> saveDifyAppsCache(List<Map<String, dynamic>> apps) async {
     await _storage.write(AppConstants.difyAppsCacheKey, apps);

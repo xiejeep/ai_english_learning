@@ -51,6 +51,8 @@ class AppConstants {
   static const String blankRoute = '/blank';
   static const String dictionaryRoute = '/dictionary';
   static const String aboutRoute = '/about';
+  static const String chatBubbleSettingsKey = 'chat_bubble_settings'; // 聊天气泡样式设置
+  static const String themeSettingsRoute = '/theme-settings';
 
   // 存储键名
   static const String tokenKey = 'user_token';
@@ -65,6 +67,7 @@ class AppConstants {
   static const String rememberAccountKey = 'remember_account';
   static const String difyAppsCacheKey = 'dify_apps_cache';
   static const String difyAppsCacheTimeKey = 'dify_apps_cache_time';
+  static const String themeColorProviderKey = 'themeColorProvider';
 
   // 默认值
   static const int defaultTimeout = 10000; // 10秒 - 缩短超时时间

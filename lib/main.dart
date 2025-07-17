@@ -9,6 +9,8 @@ import 'core/utils/app_router.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/auth/presentation/providers/auth_state.dart';
 import 'features/auth/presentation/providers/user_profile_provider.dart';
+import 'features/auth/presentation/providers/theme_color_provider.dart';
+import 'features/auth/presentation/pages/theme_settings_page.dart';
 import 'features/home/presentation/providers/dify_apps_provider.dart';
 
 void main() async {
@@ -45,11 +47,18 @@ Future<void> _initializeServices() async {
   }
 }
 
-class MyApp extends ConsumerWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> {
+  // 移除本地_state变量，直接用Provider
+  @override
+  Widget build(BuildContext context) {
+    final themeColor = ref.watch(themeColorProvider).themeColor;
     // 监听认证状态变化
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (previous?.isAuthenticated == true && next.isUnauthenticated) {
@@ -81,9 +90,36 @@ class MyApp extends ConsumerWidget {
     return MaterialApp.router(
       title: AppConstants.appName,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff424c50)),
-        useMaterial3: true,
+        primaryColor: themeColor,
+        scaffoldBackgroundColor: Colors.white,
+        appBarTheme: AppBarTheme(
+          backgroundColor: themeColor,
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: themeColor,
+            foregroundColor: Colors.white,
+            textStyle: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        floatingActionButtonTheme: FloatingActionButtonThemeData(
+          backgroundColor: themeColor,
+          foregroundColor: Colors.white,
+        ),
+        colorScheme: ColorScheme.light(
+          primary: themeColor,
+          secondary: themeColor,
+          background: Colors.white,
+          surface: Colors.white,
+          onPrimary: Colors.white,
+          onSecondary: Colors.white,
+          onBackground: Colors.black87,
+          onSurface: Colors.black87,
+        ),
         fontFamily: 'SF Pro Text',
+        useMaterial3: true,
       ),
       routerConfig: AppRouter.router,
       debugShowCheckedModeBanner: false,

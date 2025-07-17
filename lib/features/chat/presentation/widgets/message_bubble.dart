@@ -13,6 +13,11 @@ class MessageBubble extends StatelessWidget {
   final bool isCurrentlyPlaying;
   final bool isTemporary;
   final bool isTTSCompleted; // 新增TTS完成状态
+  final Color? userBubbleColor;
+  final Color? aiBubbleColor;
+  final Color? userTextColor;
+  final Color? aiTextColor;
+  final double? bubbleOpacity;
 
   // 离线TTS实例（静态，避免重复初始化）
   static final FlutterTts _flutterTts = FlutterTts();
@@ -46,6 +51,11 @@ class MessageBubble extends StatelessWidget {
     this.isCurrentlyPlaying = false,
     this.isTemporary = false,
     this.isTTSCompleted = false, // 默认TTS未完成
+    this.userBubbleColor,
+    this.aiBubbleColor,
+    this.userTextColor,
+    this.aiTextColor,
+    this.bubbleOpacity,
   });
 
   // TTS按钮图标逻辑
@@ -167,10 +177,11 @@ class MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final isMe = message.type == MessageType.user;
     final hasError = message.status == MessageStatus.failed;
+    final double opacity = bubbleOpacity ?? 0.7;
     final bubbleColor = isMe 
-        ? Theme.of(context).primaryColor.withValues(alpha: 0.4)
-        : Colors.grey.shade200.withValues(alpha: 0.4);
-    final textColor = isMe ? Colors.white : Colors.black87;
+        ? (userBubbleColor ?? Theme.of(context).primaryColor).withOpacity(opacity)
+        : (aiBubbleColor ?? Colors.grey.shade200).withOpacity(opacity);
+    final textColor = isMe ? (userTextColor ?? Colors.white) : (aiTextColor ?? Colors.black87);
     final align = isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final avatar = CircleAvatar(
       radius: 16,

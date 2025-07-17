@@ -2,6 +2,7 @@ import 'package:ai_english_learning/features/auth/presentation/pages/profile_pag
 import 'package:ai_english_learning/features/auth/presentation/pages/token_history_page.dart';
 import 'package:ai_english_learning/features/auth/presentation/pages/credits_history_page.dart';
 import 'package:ai_english_learning/features/auth/presentation/pages/settings_page.dart';
+import 'package:ai_english_learning/features/auth/presentation/pages/theme_settings_page.dart';
 import 'package:ai_english_learning/features/dictionary/presentation/pages/dictionary_page.dart';
 import 'package:ai_english_learning/features/about/presentation/pages/about_page.dart';
 import 'package:go_router/go_router.dart';
@@ -65,6 +66,10 @@ class AppRouter {
       GoRoute(
         path: AppConstants.settingsRoute,
         builder: (context, state) => const SettingsPage(),
+      ),
+      GoRoute(
+        path: AppConstants.themeSettingsRoute,
+        builder: (context, state) => const ThemeSettingsPage(),
       ),
       GoRoute(
         path: AppConstants.dictionaryRoute,
