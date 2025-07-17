@@ -301,6 +301,37 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
+  Future<List<MessageModel>> getLatestMessages({String? appId}) async {
+    print('🚀 开始加载最新消息历史... appId=$appId');
+
+    // 直接从远程API获取最新消息历史
+    final latestMessagesData = await _remoteDataSource.getLatestMessages(appId: appId);
+
+    // 将API响应转换为MessageModel
+    final messages = latestMessagesData.map((data) {
+      final role = data['role'] as String;
+      final messageType = role == 'assistant' ? MessageType.ai : MessageType.user;
+
+      return MessageModel(
+        id: data['id'] as String,
+        content: data['content'] as String,
+        type: messageType,
+        status: MessageStatus.received,
+        timestamp: DateTime.fromMillisecondsSinceEpoch(
+          (data['created_at'] as int) * 1000,
+        ),
+        conversationId: data['conversation_id'] as String? ?? '',
+      );
+    }).toList();
+
+    // 按时间戳排序（从旧到新）
+    messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    print('🔄 从远程API获取最新消息历史 ${messages.length} 条消息');
+    return messages;
+  }
+
+  @override
   Future<Conversation> createConversation(String title) async {
     // 创建一个临时会话对象，ID由服务器生成
     final conversation = ConversationModel(

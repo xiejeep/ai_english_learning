@@ -46,6 +46,9 @@ abstract class ChatRepository {
   // 获取最新会话
   Future<Conversation?> getLatestConversation({String? appId});
   
+  // 获取最新消息历史（直接调用latest/messages接口）
+  Future<List<MessageModel>> getLatestMessages({String? appId});
+  
   // 删除会话
   Future<void> deleteConversation(String conversationId, {String? appId});
   

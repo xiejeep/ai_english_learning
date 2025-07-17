@@ -252,22 +252,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     ),
                   ),
                 ),
-                ListTile(
-                  leading: Icon(
-                    Icons.info_outline,
-                    color: Theme.of(context).primaryColor,
-                  ),
-                  title: const Text('应用版本'),
-                  subtitle: const Text(AppConstants.appVersion),
-                ),
-                ListTile(
-                  leading: Icon(
-                    Icons.apps,
-                    color: Theme.of(context).primaryColor,
-                  ),
-                  title: const Text('应用名称'),
-                  subtitle: const Text(AppConstants.appName),
-                ),
+
                 ListTile(
                   leading: Icon(
                     Icons.help_outline,

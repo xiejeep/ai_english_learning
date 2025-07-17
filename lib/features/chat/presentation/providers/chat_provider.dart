@@ -5,6 +5,7 @@ import '../../data/repositories/chat_repository_impl.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../../../../shared/models/message_model.dart';
 import '../../domain/entities/conversation.dart';
+import '../../data/models/conversation_model.dart';
 import 'chat_state.dart';
 import '../../../../core/storage/storage_service.dart';
 import '../../../../core/services/stream_tts_service.dart';
@@ -796,7 +797,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     super.dispose();
   }
 
-  // 初始化聊天，加载最新会话
+  // 初始化聊天，直接加载最新消息历史
   Future<void> initializeChat() async {
     try {
       print('🚀 [AnimatedChatPage] 开始初始化聊天...');
@@ -806,14 +807,41 @@ class ChatNotifier extends StateNotifier<ChatState> {
         error: null,
       );
 
-      // 直接尝试获取最新会话，不使用本地回退
-      final latestConversation = await _repository.getLatestConversation(appId: state.appId);
+      // 直接获取最新消息历史，不需要先获取会话列表
+      final latestMessages = await _repository.getLatestMessages(appId: state.appId);
       
-      if (latestConversation != null) {
-        print('✅ 找到最新会话: ${latestConversation.id}');
-        await switchToConversation(latestConversation);
+      if (latestMessages.isNotEmpty) {
+        print('✅ 获取到最新消息历史: ${latestMessages.length} 条消息');
+        
+        // 从消息中提取会话ID，创建会话对象
+        final conversationId = latestMessages.first.conversationId;
+        if (conversationId != null && conversationId.isNotEmpty) {
+          final conversation = ConversationModel(
+            id: conversationId,
+            title: '最新对话',
+            name: '最新对话',
+            introduction: null,
+            createdAt: latestMessages.first.timestamp,
+            updatedAt: latestMessages.last.timestamp,
+            messageCount: latestMessages.length,
+            lastMessage: latestMessages.last.content,
+          );
+          
+          state = state.copyWith(
+            currentConversation: conversation,
+            messages: latestMessages,
+            status: ChatStatus.success,
+          );
+        } else {
+          print('⚠️ 消息中没有有效的会话ID');
+          state = state.copyWith(
+            currentConversation: null,
+            messages: [],
+            status: ChatStatus.success,
+          );
+        }
       } else {
-        print('⚠️ 未找到任何会话，准备开始新对话');
+        print('⚠️ 未找到任何消息历史，准备开始新对话');
         state = state.copyWith(
           currentConversation: null,
           messages: [],

@@ -10,7 +10,7 @@ class DictionaryService {
   /// 获取可用词典列表
   Future<List<DictionaryInfo>?> getAvailableDictionaries() async {
     try {
-      final response = await DioClient.instance.get('/api/admin/dictionaries');
+      final response = await DioClient.instance.get('/api/dictionary/dictionaries');
 
       if (response.statusCode == 200 && response.data != null) {
         final responseData = response.data;

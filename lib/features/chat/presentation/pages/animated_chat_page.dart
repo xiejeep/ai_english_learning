@@ -15,6 +15,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/providers/auth_state.dart';
 import '../../../../shared/models/message_model.dart';
 import '../../../../core/storage/storage_service.dart';
+import '../../../auth/presentation/providers/theme_color_provider.dart';
 
 class AnimatedChatPage extends ConsumerStatefulWidget {
   final String? type;
@@ -343,78 +344,34 @@ class _ChatContentState extends ConsumerState<_ChatContent> {
     );
   }
 
-  Widget _buildEmptyState() {
-    return Consumer(
-      builder: (context, ref, child) {
-        final chatState = ref.watch(chatProvider);
-        final currentConversation = chatState.currentConversation;
-        final hasIntroduction =
-            currentConversation?.introduction?.isNotEmpty == true;
+  Widget _buildWelcomeSection() {
+    final settings = StorageService.getChatBubbleSettings();
+    final aiBubbleColor = settings['aiBubbleColor'] != null ? Color(settings['aiBubbleColor']) : const Color(0xFFE0E0E0);
+    final aiTextColor = settings['aiTextColor'] != null ? Color(settings['aiTextColor']) : Colors.black87;
+    final bubbleOpacity = settings['opacity'] != null ? (settings['opacity'] as num).toDouble() : 0.7;
+    final Color bubbleColor = aiBubbleColor.withOpacity(bubbleOpacity);
 
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (hasIntroduction) ...[
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 24),
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).primaryColor.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Theme.of(
-                        context,
-                      ).primaryColor.withValues(alpha: 0.2),
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    currentConversation!.introduction!,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey.shade700,
-                      height: 1.4,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ] else ...[
-                _buildWelcomeBubble(),
-                const SizedBox(height: 32),
-              ],
-              _buildSuggestedPrompts(),
-            ],
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: bubbleColor,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '👋 欢迎来到英语学习助手！\n\n我可以帮你：\n• 纠正语法错误\n• 翻译中英文\n• 提供学习建议\n• 练习对话\n\n你可以用中文、英文或中英混合的方式与我交流，让我们开始你的英语学习之旅吧！',
+            style: TextStyle(
+              fontSize: 16,
+              color: aiTextColor,
+              height: 1.4,
+            ),
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildWelcomeBubble() {
-    // 创建一个模拟的欢迎消息
-    final welcomeMessage = MessageModel(
-      id: 'welcome_message',
-      content:
-          '👋 欢迎来到英语学习助手！\n\n我可以帮你：\n• 纠正语法错误\n• 翻译中英文\n• 提供学习建议\n• 练习对话\n\n你可以用中文、英文或中英混合的方式与我交流，让我们开始你的英语学习之旅吧！',
-      type: MessageType.ai,
-      timestamp: DateTime.now(),
-      status: MessageStatus.sent,
-    );
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: MessageBubble(
-        message: welcomeMessage,
-        isTemporary: false,
-        onPlayTTS: null, // 欢迎消息不需要TTS功能
-        onCopy: () => _copyMessageToClipboard(welcomeMessage.content),
-        isTTSLoading: false,
-        isCurrentlyPlaying: false,
-        isTTSCompleted: false,
+          const SizedBox(height: 16),
+          _buildSuggestedPrompts(),
+        ],
       ),
     );
   }
@@ -426,41 +383,36 @@ class _ChatContentState extends ConsumerState<_ChatContent> {
       'I like sing,jump,and play basketball',
     ];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '试试这些话题：',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade300,
-            fontWeight: FontWeight.w500,
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.start,
+      children:
+          [ Text(
+      '试试这些话题：',
+      style: TextStyle(
+        fontSize: 14,
+        color: Colors.grey.shade300,
+        fontWeight: FontWeight.w500,
+      ),
+    ),...prompts.map((prompt) {
+      return GestureDetector(
+        child: Text(
+          '$prompt  ',
+          style: const TextStyle(
+    fontSize: 14,
+    color: Colors.blue,
+    fontWeight: FontWeight.w500,
+    decoration: TextDecoration.underline,
+    decorationColor: Colors.blue,
           ),
         ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          alignment: WrapAlignment.start,
-          children:
-              prompts.map((prompt) {
-                return ActionChip(
-                  label: Text(prompt),
-                  onPressed: () {
-                    _messageController.text = prompt;
-                    _sendMessage();
-                  },
-                  backgroundColor: Theme.of(
-                    context,
-                  ).primaryColor.withValues(alpha: 0.1),
-                  labelStyle: TextStyle(
-                    color: Theme.of(context).primaryColor,
-                    fontWeight: FontWeight.w500,
-                  ),
-                );
-              }).toList(),
-        ),
-      ],
+        onTap: () {
+          _messageController.text = prompt;
+          _sendMessage();
+        },
+      );
+    }),]
     );
   }
 
@@ -539,6 +491,17 @@ class _ChatContentState extends ConsumerState<_ChatContent> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildWelcomeSection(),
+        ],
       ),
     );
   }

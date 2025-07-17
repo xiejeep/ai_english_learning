@@ -893,6 +893,95 @@ class ChatRemoteDataSource {
     }
   }
 
+  // 获取最新消息历史（直接调用latest/messages接口）
+  Future<List<Map<String, dynamic>>> getLatestMessages({String? appId}) async {
+    try {
+      final Map<String, dynamic> queryParams = {};
+      if (appId != null && appId.isNotEmpty) {
+        queryParams['appId'] = appId;
+      }
+      
+      print('🚀 获取最新消息历史请求: GET ${AppConstants.difyConversationsPath}/latest/messages${queryParams.isNotEmpty ? '?${queryParams.entries.map((e) => '${e.key}=${e.value}').join('&')}' : ''}');
+      
+      final response = await _dio.get(
+        '${AppConstants.difyConversationsPath}/latest/messages',
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+      
+      print('✅ 最新消息历史响应: ${response.data}');
+      print('📊 状态码: ${response.statusCode}');
+      
+      if (response.statusCode == 200 && response.data != null) {
+        final responseData = response.data as Map<String, dynamic>;
+        
+        // 修正：API返回的结构是 {data: {conversation: {...}, messages: [...]}}
+        final outerData = responseData['data'] as Map<String, dynamic>?;
+        if (outerData != null) {
+          final rawMessages = outerData['messages'] as List?;
+          
+          if (rawMessages != null && rawMessages.isNotEmpty) {
+            print('📋 获取到 ${rawMessages.length} 条原始消息记录');
+            
+            // 将API返回的消息记录转换为消息列表
+            // 每条记录包含query和answer，需要转换为两条消息
+            final List<Map<String, dynamic>> messages = [];
+            
+            for (final record in rawMessages) {
+              final recordMap = record as Map<String, dynamic>;
+              final createdAt = recordMap['created_at'] as int?;
+              final conversationId = recordMap['conversation_id'] as String?;
+              final messageId = recordMap['id'] as String?;
+              
+              // 用户消息（query）
+              final query = recordMap['query'] as String?;
+              if (query != null && query.isNotEmpty) {
+                messages.add({
+                  'id': '${messageId}_user',
+                  'content': query,
+                  'role': 'user',
+                  'created_at': createdAt,
+                  'conversation_id': conversationId,
+                });
+              }
+              
+              // AI回复（answer）
+              final answer = recordMap['answer'] as String?;
+              if (answer != null && answer.isNotEmpty) {
+                messages.add({
+                  'id': '${messageId}_assistant',
+                  'content': answer,
+                  'role': 'assistant',
+                  'created_at': createdAt,
+                  'conversation_id': conversationId,
+                });
+              }
+            }
+            
+            print('📋 转换后得到 ${messages.length} 条消息');
+            return messages;
+          }
+        }
+      }
+      
+      print('⚠️ 最新消息历史响应格式异常');
+      return [];
+    } on DioException catch (e) {
+      print('❌ 获取最新消息历史失败: ${e.message}');
+      print('📍 请求URL: ${e.requestOptions.uri}');
+      if (e.response != null) {
+        print('📦 错误响应体: ${e.response?.data}');
+        print('📊 错误状态码: ${e.response?.statusCode}');
+      }
+      throw Exception('获取最新消息历史失败: ${e.message}');
+    }
+  }
+
   // 获取token使用历史
   Future<List<Map<String, dynamic>>> getTokenUsageHistory({String? appId}) async {
     try {

@@ -10,7 +10,6 @@ class AboutPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('关于我们'),
-        backgroundColor: AppConstants.primaryColor,
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -109,8 +108,7 @@ class AboutPage extends StatelessWidget {
               context,
               '联系我们',
               '如果您有任何问题、建议或反馈，欢迎通过以下方式联系我们：\n\n'
-                  '邮箱：support@qutalk.com\n'
-                  '官网：www.qutalk.com\n\n'
+                  '邮箱：qtalk@foxmail.com\n'
                   '我们重视每一位用户的意见，您的反馈将帮助我们不断改进产品。',
               Icons.contact_mail_outlined,
             ),
