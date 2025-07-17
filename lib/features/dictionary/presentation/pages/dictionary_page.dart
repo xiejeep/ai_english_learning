@@ -21,7 +21,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
   List<DictionaryInfo> _dictionaries = [];
   DictionaryInfo? _selectedDictionary;
   bool _isDictionariesLoading = true;
-  
+
   // 搜索关键词相关
   late TextEditingController _searchController;
   String _currentSearchWord = '';
@@ -33,7 +33,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
     _searchController = TextEditingController(text: widget.word);
     _loadDictionaries();
   }
-  
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -42,7 +42,8 @@ class _DictionaryPageState extends State<DictionaryPage> {
 
   Future<void> _loadDictionaries() async {
     try {
-      final dictionaries = await DictionaryService.instance.getAvailableDictionaries();
+      final dictionaries =
+          await DictionaryService.instance.getAvailableDictionaries();
       setState(() {
         _dictionaries = dictionaries ?? [];
         _isDictionariesLoading = false;
@@ -63,7 +64,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
 
   Future<void> _lookupWord({String? customWord}) async {
     final wordToLookup = customWord ?? _currentSearchWord;
-    
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -83,59 +84,60 @@ class _DictionaryPageState extends State<DictionaryPage> {
           _errorMessage = '未找到"$wordToLookup"的释义';
         } else if (result.htmlDefinition != null) {
           // 创建WebView控制器并加载HTML内容
-          _webViewController = WebViewController()
-            ..setJavaScriptMode(JavaScriptMode.unrestricted)
-            ..setBackgroundColor(const Color(0x00000000))
-            ..setNavigationDelegate(
-              NavigationDelegate(
-                onProgress: (int progress) {
-                  print('🔄 WebView加载进度: $progress%');
-                },
-                onPageStarted: (String url) {
-                  print('📄 开始加载页面: $url');
-                },
-                onPageFinished: (String url) {
-                  print('✅ 页面加载完成: $url');
-                },
-                onWebResourceError: (WebResourceError error) {
-                  print('❌ WebView资源加载错误:');
-                  print('   错误描述: ${error.description}');
-                  print('   错误代码: ${error.errorCode}');
-                  print('   错误类型: ${error.errorType}');
-                  print('   失败URL: ${error.url}');
-                },
-                onNavigationRequest: (NavigationRequest request) {
-                  print('🔗 导航请求: ${request.url}');
-                  
-                  // 阻止entry://等非HTTP协议的跳转
-                  if (request.url.startsWith('entry://') || 
-                      request.url.startsWith('sound://') ||
-                      (!request.url.startsWith('http://') && 
-                       !request.url.startsWith('https://') && 
-                       !request.url.startsWith('about:'))) {
-                    print('🚫 阻止非HTTP协议跳转: ${request.url}');
-                    return NavigationDecision.prevent;
-                  }
-                  
-                  // 只允许about:blank和资源URL
-                  if (request.url == 'about:blank' || 
-                      request.url.contains('/api/dictionary/resource/')) {
-                    return NavigationDecision.navigate;
-                  }
-                  
-                  // 阻止其他外部链接跳转
-                  print('🚫 阻止外部链接跳转: ${request.url}');
-                  return NavigationDecision.prevent;
-                },
-              ),
-            )
-            ..addJavaScriptChannel(
-              'ResourceLogger',
-              onMessageReceived: (JavaScriptMessage message) {
-                print('📱 JavaScript消息: ${message.message}');
-              },
-            )
-            ..loadHtmlString(_buildHtmlContent(result.htmlDefinition!));
+          _webViewController =
+              WebViewController()
+                ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                ..setBackgroundColor(const Color(0x00000000))
+                ..setNavigationDelegate(
+                  NavigationDelegate(
+                    onProgress: (int progress) {
+                      print('🔄 WebView加载进度: $progress%');
+                    },
+                    onPageStarted: (String url) {
+                      print('📄 开始加载页面: $url');
+                    },
+                    onPageFinished: (String url) {
+                      print('✅ 页面加载完成: $url');
+                    },
+                    onWebResourceError: (WebResourceError error) {
+                      print('❌ WebView资源加载错误:');
+                      print('   错误描述: ${error.description}');
+                      print('   错误代码: ${error.errorCode}');
+                      print('   错误类型: ${error.errorType}');
+                      print('   失败URL: ${error.url}');
+                    },
+                    onNavigationRequest: (NavigationRequest request) {
+                      print('🔗 导航请求: ${request.url}');
+
+                      // 阻止entry://等非HTTP协议的跳转
+                      if (request.url.startsWith('entry://') ||
+                          request.url.startsWith('sound://') ||
+                          (!request.url.startsWith('http://') &&
+                              !request.url.startsWith('https://') &&
+                              !request.url.startsWith('about:'))) {
+                        print('🚫 阻止非HTTP协议跳转: ${request.url}');
+                        return NavigationDecision.prevent;
+                      }
+
+                      // 只允许about:blank和资源URL
+                      if (request.url == 'about:blank' ||
+                          request.url.contains('/api/dictionary/resource/')) {
+                        return NavigationDecision.navigate;
+                      }
+
+                      // 阻止其他外部链接跳转
+                      print('🚫 阻止外部链接跳转: ${request.url}');
+                      return NavigationDecision.prevent;
+                    },
+                  ),
+                )
+                ..addJavaScriptChannel(
+                  'ResourceLogger',
+                  onMessageReceived: (JavaScriptMessage message) {
+                    print('📱 JavaScript消息: ${message.message}');
+                  },
+                )
+                ..loadHtmlString(_buildHtmlContent(result.htmlDefinition!));
         }
       });
     } catch (e) {
@@ -159,14 +161,16 @@ class _DictionaryPageState extends State<DictionaryPage> {
   String _buildHtmlContent(String definition) {
     print('🔵 开始构建HTML内容');
     print('📄 原始HTML长度: ${definition.length}');
-    print('📄 原始HTML内容预览: ${definition.substring(0, definition.length > 200 ? 200 : definition.length)}...');
-    
+    print(
+      '📄 原始HTML内容预览: ${definition.substring(0, definition.length > 200 ? 200 : definition.length)}...',
+    );
+
     // 处理资源文件路径
     String processedDefinition = _processResourcePaths(definition);
-    
+
     // 同时处理CSS文件路径
     processedDefinition = _processCssFilePaths(processedDefinition);
-    
+
     final htmlContent = '''
     <!DOCTYPE html>
     <html>
@@ -282,10 +286,12 @@ class _DictionaryPageState extends State<DictionaryPage> {
     </body>
     </html>
     ''';
-    
+
     print('✅ 最终HTML内容长度: ${htmlContent.length}');
-    print('✅ 最终HTML内容预览: ${htmlContent.substring(0, htmlContent.length > 500 ? 500 : htmlContent.length)}...');
-    
+    print(
+      '✅ 最终HTML内容预览: ${htmlContent.substring(0, htmlContent.length > 500 ? 500 : htmlContent.length)}...',
+    );
+
     return htmlContent;
   }
 
@@ -295,55 +301,66 @@ class _DictionaryPageState extends State<DictionaryPage> {
       print('⚠️ 未选择词典，跳过CSS路径处理');
       return htmlContent;
     }
-    
+
     print('🎨 开始处理CSS文件路径');
     print('📖 选中词典ID: ${_selectedDictionary!.id}');
-    
+
     // 构建资源基础URL
-    final baseUrl = AppConstants.baseUrl.endsWith('/') 
-        ? AppConstants.baseUrl.substring(0, AppConstants.baseUrl.length - 1)
-        : AppConstants.baseUrl;
-    final resourceBaseUrl = '$baseUrl/api/dictionary/resource/${_selectedDictionary!.id}/';
-    
+    final baseUrl =
+        AppConstants.baseUrl.endsWith('/')
+            ? AppConstants.baseUrl.substring(0, AppConstants.baseUrl.length - 1)
+            : AppConstants.baseUrl;
+    final resourceBaseUrl =
+        '$baseUrl/api/dictionary/resource/${_selectedDictionary!.id}/';
+
     print('🔗 基础URL: $baseUrl');
     print('🔗 资源基础URL: $resourceBaseUrl');
-    
+
     String processedContent = htmlContent;
-    
+
     // 处理CSS文件的href属性 - 修复正则表达式以匹配/api开头的路径
-    final cssLinkMatches = RegExp('href="(/api/dictionary/resource/[^/]+/[^"]*.css)"', caseSensitive: false).allMatches(htmlContent);
+    final cssLinkMatches = RegExp(
+      'href="(/api/dictionary/resource/[^/]+/[^"]*.css)"',
+      caseSensitive: false,
+    ).allMatches(htmlContent);
     print('🔍 找到 ${cssLinkMatches.length} 个CSS link标签');
-    
+
     for (final match in cssLinkMatches) {
       final originalMatch = match.group(0)!;
       final cssPath = match.group(1)!;
       print('📎 原始CSS链接: $originalMatch');
       print('📎 CSS相对路径: $cssPath');
-      
+
       final newHref = 'href="$baseUrl$cssPath"';
       processedContent = processedContent.replaceAll(originalMatch, newHref);
       print('✅ 转换后: $newHref');
     }
-    
+
     // 处理CSS中的@import语句
-    final cssImportMatches = RegExp('@import\\s+["\'](\\w+\\.css)["\']', caseSensitive: false).allMatches(htmlContent);
+    final cssImportMatches = RegExp(
+      '@import\\s+["\'](\\w+\\.css)["\']',
+      caseSensitive: false,
+    ).allMatches(htmlContent);
     print('🔍 找到 ${cssImportMatches.length} 个@import语句');
-    
+
     for (final match in cssImportMatches) {
       final originalMatch = match.group(0)!;
       final cssPath = match.group(1)!;
       print('📥 原始@import: $originalMatch');
       print('📥 CSS文件名: $cssPath');
-      
+
       if (!cssPath.startsWith('http')) {
         final newImport = '@import "$resourceBaseUrl$cssPath"';
-        processedContent = processedContent.replaceAll(originalMatch, newImport);
+        processedContent = processedContent.replaceAll(
+          originalMatch,
+          newImport,
+        );
         print('✅ 转换后: $newImport');
       } else {
         print('⏭️ 跳过绝对URL: $cssPath');
       }
     }
-    
+
     print('🎨 CSS路径处理完成');
     return processedContent;
   }
@@ -354,52 +371,60 @@ class _DictionaryPageState extends State<DictionaryPage> {
       print('⚠️ 未选择词典，跳过资源路径处理');
       return htmlContent;
     }
-    
+
     print('🖼️ 开始处理图片和音频文件路径');
     print('📖 选中词典ID: ${_selectedDictionary!.id}');
-    
+
     // 构建资源基础URL
-    final baseUrl = AppConstants.baseUrl.endsWith('/') 
-        ? AppConstants.baseUrl.substring(0, AppConstants.baseUrl.length - 1)
-        : AppConstants.baseUrl;
-    final resourceBaseUrl = '$baseUrl/api/dictionary/resource/${_selectedDictionary!.id}/';
-    
+    final baseUrl =
+        AppConstants.baseUrl.endsWith('/')
+            ? AppConstants.baseUrl.substring(0, AppConstants.baseUrl.length - 1)
+            : AppConstants.baseUrl;
+    final resourceBaseUrl =
+        '$baseUrl/api/dictionary/resource/${_selectedDictionary!.id}/';
+
     print('🔗 基础URL: $baseUrl');
     print('🔗 资源基础URL: $resourceBaseUrl');
-    
+
     // 简化的处理方式：查找并替换常见的资源文件引用
     String processedContent = htmlContent;
-    
+
     // 处理图片文件 - 修复正则表达式以匹配/api开头的路径
-    final imageMatches = RegExp('src="(/api/dictionary/resource/[^/]+/[^"]*.(png|jpg|jpeg|gif|svg|webp))"', caseSensitive: false).allMatches(htmlContent);
+    final imageMatches = RegExp(
+      'src="(/api/dictionary/resource/[^/]+/[^"]*.(png|jpg|jpeg|gif|svg|webp))"',
+      caseSensitive: false,
+    ).allMatches(htmlContent);
     print('🔍 找到 ${imageMatches.length} 个图片文件');
-    
+
     for (final match in imageMatches) {
       final originalMatch = match.group(0)!;
       final imagePath = match.group(1)!;
       print('🖼️ 原始图片引用: $originalMatch');
       print('🖼️ 图片相对路径: $imagePath');
-      
+
       final newSrc = 'src="$baseUrl$imagePath"';
       processedContent = processedContent.replaceAll(originalMatch, newSrc);
       print('✅ 转换后: $newSrc');
     }
-    
+
     // 处理音频文件 - 修复正则表达式以匹配/api开头的路径
-    final audioMatches = RegExp('src="(/api/dictionary/resource/[^/]+/[^"]*.(mp3|wav|ogg|m4a))"', caseSensitive: false).allMatches(htmlContent);
+    final audioMatches = RegExp(
+      'src="(/api/dictionary/resource/[^/]+/[^"]*.(mp3|wav|ogg|m4a))"',
+      caseSensitive: false,
+    ).allMatches(htmlContent);
     print('🔍 找到 ${audioMatches.length} 个音频文件');
-    
+
     for (final match in audioMatches) {
       final originalMatch = match.group(0)!;
       final audioPath = match.group(1)!;
       print('🎵 原始音频引用: $originalMatch');
       print('🎵 音频相对路径: $audioPath');
-      
+
       final newSrc = 'src="$baseUrl$audioPath"';
       processedContent = processedContent.replaceAll(originalMatch, newSrc);
       print('✅ 转换后: $newSrc');
     }
-    
+
     print('🖼️ 图片和音频路径处理完成');
     return processedContent;
   }
@@ -432,9 +457,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border(
-                bottom: BorderSide(color: Colors.grey.shade200),
-              ),
+              border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.grey.shade100,
@@ -451,21 +474,25 @@ class _DictionaryPageState extends State<DictionaryPage> {
                   Icons.search,
                   color: Theme.of(context).primaryColor,
                 ),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                        },
-                      )
-                    : null,
+                suffixIcon:
+                    _searchController.text.isNotEmpty
+                        ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                          },
+                        )
+                        : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: Colors.grey.shade300),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).primaryColor,
+                    width: 2,
+                  ),
                 ),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -479,7 +506,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
               },
             ),
           ),
-          
+
           // 词典选择区域
           if (!_isDictionariesLoading && _dictionaries.isNotEmpty)
             Container(
@@ -487,9 +514,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.grey.shade50,
-                border: Border(
-                  bottom: BorderSide(color: Colors.grey.shade300),
-                ),
+                border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
               ),
               child: Row(
                 children: [
@@ -501,10 +526,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
                   const SizedBox(width: 8),
                   const Text(
                     '选择词典：',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -512,27 +534,34 @@ class _DictionaryPageState extends State<DictionaryPage> {
                       value: _selectedDictionary,
                       decoration: InputDecoration(
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide(color: Colors.grey.shade300),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Theme.of(context).primaryColor),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).primaryColor,
+                          ),
                         ),
                       ),
-                      items: _dictionaries.map((dictionary) {
-                        return DropdownMenuItem<DictionaryInfo>(
-                          value: dictionary,
-                          child: Text(
-                            dictionary.displayName,
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        );
-                      }).toList(),
+                      items:
+                          _dictionaries.map((dictionary) {
+                            return DropdownMenuItem<DictionaryInfo>(
+                              value: dictionary,
+                              child: Text(
+                                dictionary.displayName,
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            );
+                          }).toList(),
                       onChanged: (DictionaryInfo? newDictionary) {
-                        if (newDictionary != null && newDictionary != _selectedDictionary) {
+                        if (newDictionary != null &&
+                            newDictionary != _selectedDictionary) {
                           setState(() {
                             _selectedDictionary = newDictionary;
                           });
@@ -544,11 +573,9 @@ class _DictionaryPageState extends State<DictionaryPage> {
                 ],
               ),
             ),
-          
+
           // 词典内容区域
-          Expanded(
-            child: _buildBody(),
-          ),
+          Expanded(child: _buildBody()),
         ],
       ),
     );
@@ -575,18 +602,11 @@ class _DictionaryPageState extends State<DictionaryPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.search_off,
-                size: 80,
-                color: Colors.grey.shade400,
-              ),
+              Icon(Icons.search_off, size: 80, color: Colors.grey.shade400),
               const SizedBox(height: 24),
               Text(
                 _errorMessage ?? '查询失败',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Colors.grey.shade600,
-                ),
+                style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
@@ -651,9 +671,9 @@ class _DictionaryPageState extends State<DictionaryPage> {
               ],
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // 定义
           Container(
             width: double.infinity,
@@ -693,10 +713,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
                 const SizedBox(height: 12),
                 Text(
                   _result!.definition ?? '暂无释义',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    height: 1.6,
-                  ),
+                  style: const TextStyle(fontSize: 16, height: 1.6),
                 ),
               ],
             ),

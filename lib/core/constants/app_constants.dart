@@ -4,13 +4,13 @@ class AppConstants {
   // 应用信息
   static const String appName = '趣TALK伙伴';
   static const String appVersion = '1.0.0';
-  
+
   // API配置
-  static const String baseUrl = 'https://app.classhorse.cn/';
+  // static const String baseUrl = 'https://app.classhorse.cn/';
   // static const String baseUrl = 'http://192.168.8.167:3000/';
-  // static const String baseUrl = 'http://app.classhorse.top:3000/';
+  static const String baseUrl = 'http://app.classhorse.top:18080/';
   static const String apiVersion = 'v1';
-  
+
   // API路径
   static const String authSendCodePath = '/api/auth/send-code';
   static const String authRegisterPath = '/api/auth/register';
@@ -23,15 +23,16 @@ class AppConstants {
   static const String difychatPath = '/api/dify/chat-messages';
   static const String difyTtsPath = '/api/dify/text-to-audio';
   static const String difyConversationsPath = '/api/dify/conversations';
-  static const String difyTokenUsageHistoryPath = '/api/dify/token-usage-history';
+  static const String difyTokenUsageHistoryPath =
+      '/api/dify/token-usage-history';
   static const String difyAppsPath = '/api/user/dify-apps';
   static const String difyWorkflowsRunPath = '/api/dify/workflows/run';
-  
+
   // 主题颜色
   static const Color primaryColor = Color.fromARGB(255, 47, 33, 28);
   static const Color primaryLightColor = Color(0xFF7B93FF);
   static const Color primaryDarkColor = Color(0xFF2C5BFF);
-  
+
   // 路由路径
   static const String splashRoute = '/';
   static const String loginRoute = '/login';
@@ -50,7 +51,7 @@ class AppConstants {
   static const String blankRoute = '/blank';
   static const String dictionaryRoute = '/dictionary';
   static const String aboutRoute = '/about';
-  
+
   // 存储键名
   static const String tokenKey = 'user_token';
   static const String userInfoKey = 'user_info';
@@ -64,12 +65,12 @@ class AppConstants {
   static const String rememberAccountKey = 'remember_account';
   static const String difyAppsCacheKey = 'dify_apps_cache';
   static const String difyAppsCacheTimeKey = 'dify_apps_cache_time';
-  
+
   // 默认值
   static const int defaultTimeout = 10000; // 10秒 - 缩短超时时间
   static const int maxRetryCount = 3;
   static const bool defaultAutoPlay = true;
-  
+
   // 积分相关
   static const int dailyCheckinReward = 10;
   static const int chatMessageReward = 5;

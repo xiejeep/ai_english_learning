@@ -19,7 +19,7 @@ class AnimatedChatPage extends ConsumerStatefulWidget {
   final String? type;
   final String? appId;
   final String? appName;
-  
+
   const AnimatedChatPage({super.key, this.type, this.appId, this.appName});
 
   @override
@@ -29,11 +29,11 @@ class AnimatedChatPage extends ConsumerStatefulWidget {
 class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  
+
   // Rive animation controller
   Artboard? _riveArtboard;
   StateMachineController? _controller;
-  
+
   // Animation control inputs
   SMITrigger? _startTrigger;
   SMITrigger? _stopTrigger;
@@ -44,7 +44,6 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
     _loadRiveAnimation();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeChat();
-      FocusScope.of(context).unfocus();
     });
   }
 
@@ -60,15 +59,18 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
     rootBundle.load('assets/rive/monnalisha.riv').then((data) async {
       final file = RiveFile.import(data);
       final artboard = file.mainArtboard;
-      final controller = StateMachineController.fromArtboard(artboard, 'State Machine 1');
-      
+      final controller = StateMachineController.fromArtboard(
+        artboard,
+        'State Machine 1',
+      );
+
       if (controller != null) {
         artboard.addController(controller);
-        
+
         // 获取动画输入控制器
         _startTrigger = controller.findSMI('start') as SMITrigger?;
         _stopTrigger = controller.findSMI('stop') as SMITrigger?;
-        
+
         setState(() {
           _riveArtboard = artboard;
           _controller = controller;
@@ -84,18 +86,9 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
     await ref.read(chatProvider.notifier).initializeChat();
   }
 
+  void _onStreamingStarted() {}
 
-
-
-
-
-  void _onStreamingStarted() {
-    
-  }
-
-  void _onStreamingEnded() {
-    
-  }
+  void _onStreamingEnded() {}
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
@@ -115,7 +108,7 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
         builder: (context, ref, child) {
           final chatState = ref.watch(chatProvider);
           final currentConversation = chatState.currentConversation;
-          
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -138,13 +131,14 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
       elevation: 0,
       actions: [
         Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            tooltip: '会话列表',
-            onPressed: () {
-              Scaffold.of(context).openDrawer();
-            },
-          ),
+          builder:
+              (context) => IconButton(
+                icon: const Icon(Icons.menu),
+                tooltip: '会话列表',
+                onPressed: () {
+                  Scaffold.of(context).openDrawer();
+                },
+              ),
         ),
       ],
     );
@@ -153,7 +147,8 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
   @override
   Widget build(BuildContext context) {
     ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.isUnauthenticated && next.errorMessage?.contains('登录已过期') == true) {
+      if (next.isUnauthenticated &&
+          next.errorMessage?.contains('登录已过期') == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('登录已过期，请重新登录'),
@@ -178,22 +173,21 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
         if (previous.isStreaming && !next.isStreaming) {
           _onStreamingEnded();
         }
-        
+
         // 监听TTS播放状态变化
         if (!previous.isTTSPlaying && next.isTTSPlaying) {
           // TTS开始播放，触发开始动画
           _startTrigger?.fire();
         }
-        
+
         if (previous.isTTSPlaying && !next.isTTSPlaying) {
           // TTS停止播放，触发停止动画
           _stopTrigger?.fire();
         }
-        
-        if (previous.status != ChatStatus.success && 
-            next.status == ChatStatus.success && 
-            next.messages.isNotEmpty) {
-        }
+
+        if (previous.status != ChatStatus.success &&
+            next.status == ChatStatus.success &&
+            next.messages.isNotEmpty) {}
       }
     });
 
@@ -205,41 +199,54 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
           // Rive animation background
           if (_riveArtboard != null)
             Positioned.fill(
-              child: Rive(
-                artboard: _riveArtboard!,
-                fit: BoxFit.cover,
-              ),
+              child: Rive(artboard: _riveArtboard!, fit: BoxFit.cover),
             ),
-          
+
           // Chat content overlay
           Positioned.fill(
             child: Container(
-              decoration:const BoxDecoration(
-                color: Colors.transparent,
-              ),
-              child: GestureDetector(
-                onTap: () {
-                  FocusScope.of(context).unfocus();
-                },
-                child: Consumer(
-                  builder: (context, ref, child) {
-                    final chatState = ref.watch(chatProvider);
-
-                    return Column(
-                      children: [
-                        Expanded(
-                          child: _buildMessagesList(chatState),
-                        ),
-                        _buildMessageInput(chatState),
-                      ],
-                    );
-                  },
-                ),
-              ),
+              decoration: const BoxDecoration(color: Colors.transparent),
+              child: const _ChatContent(),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+// 独立的聊天内容组件，避免因抽屉状态变化导致的重建
+class _ChatContent extends ConsumerStatefulWidget {
+  const _ChatContent();
+
+  @override
+  ConsumerState<_ChatContent> createState() => _ChatContentState();
+}
+
+class _ChatContentState extends ConsumerState<_ChatContent> {
+  final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, child) {
+        final chatState = ref.watch(chatProvider);
+
+        return Column(
+          children: [
+            Expanded(child: _buildMessagesList(chatState)),
+            _buildMessageInput(chatState),
+          ],
+        );
+      },
     );
   }
 
@@ -248,7 +255,7 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
     if (state.status == ChatStatus.error) {
       return _buildErrorWidget(state.error ?? '未知错误');
     }
-    
+
     if (state.status == ChatStatus.loading && state.messages.isEmpty) {
       return Center(
         child: Column(
@@ -258,10 +265,7 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
             const SizedBox(height: 16),
             Text(
               '正在加载对话...',
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
             ),
           ],
         ),
@@ -276,11 +280,12 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
       controller: EasyRefreshController(),
       header: const ClassicHeader(position: IndicatorPosition.locator),
       footer: const CupertinoFooter(position: IndicatorPosition.locator),
-      onLoad: (state.hasMoreMessages && !state.isLoadingMore)
-          ? () async {
-              await ref.read(chatProvider.notifier).loadMoreMessages();
-            }
-          : null,
+      onLoad:
+          (state.hasMoreMessages && !state.isLoadingMore)
+              ? () async {
+                await ref.read(chatProvider.notifier).loadMoreMessages();
+              }
+              : null,
       child: ListView.builder(
         controller: _scrollController,
         reverse: true,
@@ -289,7 +294,8 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
         itemBuilder: (context, index) {
           final reversedIndex = state.messages.length - 1 - index;
           final msg = state.messages[reversedIndex];
-          final isTemporary = msg.isAI &&
+          final isTemporary =
+              msg.isAI &&
               (msg.content.contains('思考中') ||
                   msg.content.contains('输入') ||
                   state.isStreaming && msg == state.messages.last);
@@ -298,17 +304,22 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
             child: MessageBubble(
               message: msg,
               isTemporary: isTemporary,
-              onPlayTTS: msg.isAI
-                  ? () {
-                      if (state.isTTSPlaying) {
-                        ref.read(chatProvider.notifier).stopTTS();
-                      } else {
-                        ref.read(chatProvider.notifier).playTTS(msg.id);
+              onPlayTTS:
+                  msg.isAI
+                      ? () {
+                        if (state.isTTSPlaying) {
+                          ref.read(chatProvider.notifier).stopTTS();
+                        } else {
+                          ref.read(chatProvider.notifier).playTTS(msg.id);
+                        }
                       }
-                    }
-                  : null,
+                      : null,
               onCopy: () => _copyMessageToClipboard(msg.content),
-              onRetry: msg.status == MessageStatus.failed ? () => ref.read(chatProvider.notifier).retryMessage(msg.id) : null,
+              onRetry:
+                  msg.status == MessageStatus.failed
+                      ? () =>
+                          ref.read(chatProvider.notifier).retryMessage(msg.id)
+                      : null,
               isTTSLoading: state.isTTSLoading,
               isCurrentlyPlaying: state.isTTSPlaying,
               isTTSCompleted: state.isTTSCompleted,
@@ -324,8 +335,9 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
       builder: (context, ref, child) {
         final chatState = ref.watch(chatProvider);
         final currentConversation = chatState.currentConversation;
-        final hasIntroduction = currentConversation?.introduction?.isNotEmpty == true;
-        
+        final hasIntroduction =
+            currentConversation?.introduction?.isNotEmpty == true;
+
         return Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -335,10 +347,14 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
                   margin: const EdgeInsets.symmetric(horizontal: 24),
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor.withValues(alpha: 0.05),
+                    color: Theme.of(
+                      context,
+                    ).primaryColor.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
+                      color: Theme.of(
+                        context,
+                      ).primaryColor.withValues(alpha: 0.2),
                       width: 1,
                     ),
                   ),
@@ -403,20 +419,23 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: prompts.map((prompt) {
-            return ActionChip(
-              label: Text(prompt),
-              onPressed: () {
-                _messageController.text = prompt;
-                _sendMessage();
-              },
-              backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-              labelStyle: TextStyle(
-                color: Theme.of(context).primaryColor,
-                fontWeight: FontWeight.w500,
-              ),
-            );
-          }).toList(),
+          children:
+              prompts.map((prompt) {
+                return ActionChip(
+                  label: Text(prompt),
+                  onPressed: () {
+                    _messageController.text = prompt;
+                    _sendMessage();
+                  },
+                  backgroundColor: Theme.of(
+                    context,
+                  ).primaryColor.withValues(alpha: 0.1),
+                  labelStyle: TextStyle(
+                    color: Theme.of(context).primaryColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                );
+              }).toList(),
         ),
       ],
     );
@@ -425,16 +444,14 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
   Widget _buildMessageInput(ChatState state) {
     return MessageInput(
       controller: _messageController,
-      isLoading: state.status == ChatStatus.loading || 
-                 state.status == ChatStatus.sending || 
-                 state.status == ChatStatus.thinking,
+      isLoading:
+          state.status == ChatStatus.loading ||
+          state.status == ChatStatus.sending ||
+          state.status == ChatStatus.thinking,
       isStreaming: state.isStreaming,
       onSend: _sendMessage,
       onStop: () => ref.read(chatProvider.notifier).stopGeneration(),
-      hintText: state.currentConversation == null 
-        ? '创建会话中...' 
-        : '输入你想练习的内容...',
-      autofocus: false,
+      hintText: state.currentConversation == null ? '创建会话中...' : '输入你想练习的内容...',
       enableInteractiveSelection: true,
     );
   }
@@ -443,11 +460,14 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
     final content = _messageController.text.trim();
     if (content.isEmpty) return;
 
-    FocusScope.of(context).unfocus();
+    // 获取当前页面的 type 参数
+    final animatedChatPageState =
+        context.findAncestorStateOfType<_AnimatedChatPageState>();
+    final type = animatedChatPageState?.widget.type;
 
     // 统一使用 sendMessageStreamWithType 方法，如果没有指定类型则传入 null
-    ref.read(chatProvider.notifier).sendMessageStreamWithType(content, widget.type);
-    
+    ref.read(chatProvider.notifier).sendMessageStreamWithType(content, type);
+
     _messageController.clear();
   }
 
@@ -468,23 +488,21 @@ class _AnimatedChatPageState extends ConsumerState<AnimatedChatPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.wifi_off,
-              size: 80,
-              color: Colors.grey.shade400,
-            ),
+            Icon(Icons.wifi_off, size: 80, color: Colors.grey.shade400),
             const SizedBox(height: 24),
             Text(
               error,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade700,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
             ElevatedButton.icon(
-              onPressed: _initializeChat,
+              onPressed: () {
+                // 获取当前页面状态来调用初始化方法
+                final animatedChatPageState =
+                    context.findAncestorStateOfType<_AnimatedChatPageState>();
+                animatedChatPageState?._initializeChat();
+              },
               icon: const Icon(Icons.refresh),
               label: const Text('重试'),
               style: ElevatedButton.styleFrom(

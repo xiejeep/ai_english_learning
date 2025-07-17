@@ -7,7 +7,7 @@ class MessageInput extends StatefulWidget {
   final VoidCallback? onSend;
   final VoidCallback? onStop;
   final String? hintText;
-  final bool autofocus;
+  // final bool autofocus;
   final bool enableInteractiveSelection;
 
   const MessageInput({
@@ -18,7 +18,7 @@ class MessageInput extends StatefulWidget {
     this.onSend,
     this.onStop,
     this.hintText,
-    this.autofocus = false,
+    // this.autofocus = false,
     this.enableInteractiveSelection = true,
   });
 
@@ -28,12 +28,12 @@ class MessageInput extends StatefulWidget {
 
 class _MessageInputState extends State<MessageInput> {
   bool _isEmpty = true;
-  late final FocusNode _focusNode;
+  FocusNode? _focusNode;
 
   @override
   void initState() {
     super.initState();
-    _focusNode = FocusNode();
+    _createFocusNode();
     widget.controller.addListener(_onTextChanged);
     _isEmpty = widget.controller.text.trim().isEmpty;
   }
@@ -41,8 +41,30 @@ class _MessageInputState extends State<MessageInput> {
   @override
   void dispose() {
     widget.controller.removeListener(_onTextChanged);
-    _focusNode.dispose();
+    _focusNode?.removeListener(_onFocusChanged);
+    _focusNode?.dispose();
     super.dispose();
+  }
+
+  void _createFocusNode() {
+    _focusNode?.removeListener(_onFocusChanged);
+    _focusNode?.dispose();
+    _focusNode = FocusNode();
+    _focusNode!.addListener(_onFocusChanged);
+  }
+
+  void _onFocusChanged() {
+    // 当焦点失去时，延迟重置 FocusNode 以清除"记忆"
+    if (!_focusNode!.hasFocus) {
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted && !_focusNode!.hasFocus) {
+          // 重新创建 FocusNode 来彻底清除焦点历史
+          setState(() {
+            _createFocusNode();
+          });
+        }
+      });
+    }
   }
 
   void _onTextChanged() {
@@ -69,15 +91,13 @@ class _MessageInputState extends State<MessageInput> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         border: Border(
-          top: BorderSide(
-            color: theme.colorScheme.outline.withOpacity(0.2),
-          ),
+          top: BorderSide(color: theme.colorScheme.outline.withOpacity(0.2)),
         ),
       ),
       child: SafeArea(
@@ -92,7 +112,9 @@ class _MessageInputState extends State<MessageInput> {
                   maxHeight: 120,
                 ),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                  color: theme.colorScheme.surfaceContainerHighest.withOpacity(
+                    0.5,
+                  ),
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
                     color: theme.colorScheme.outline.withOpacity(0.3),
@@ -101,9 +123,7 @@ class _MessageInputState extends State<MessageInput> {
                 child: TextField(
                   controller: widget.controller,
                   focusNode: _focusNode,
-                  autofocus: widget.autofocus,
                   enableInteractiveSelection: widget.enableInteractiveSelection,
-                  // 移除 canRequestFocus 限制，允许用户点击输入框获得焦点
                   maxLines: null,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _handleSend(),
@@ -170,37 +190,35 @@ class _MessageInputState extends State<MessageInput> {
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: onPressed != null
-            ? [
-                BoxShadow(
-                  color: backgroundColor.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : null,
+        boxShadow:
+            onPressed != null
+                ? [
+                  BoxShadow(
+                    color: backgroundColor.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+                : null,
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onPressed,
           borderRadius: BorderRadius.circular(24),
-          child: widget.isLoading && !widget.isStreaming
-              ? const Center(
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          child:
+              widget.isLoading && !widget.isStreaming
+                  ? const Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
                     ),
-                  ),
-                )
-              : Icon(
-                  icon,
-                  color: iconColor,
-                  size: 20,
-                ),
+                  )
+                  : Icon(icon, color: iconColor, size: 20),
         ),
       ),
     );
